@@ -1,0 +1,10 @@
+version: "3"
+
+services:
+  python:
+    build:
+      dockerfile: .docker/Dockerfile
+      context: .
+    volumes:
+      - ./src:/src
+    tty: true
