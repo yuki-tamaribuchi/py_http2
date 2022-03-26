@@ -1,6 +1,19 @@
 import struct
 
 from .settings import Settings
+from .headers import Headers
+
+
+def is_bin(data):
+	for d in data:
+		if not d in [0, 1]:
+			return False
+	return True
+
+def bin_padding(data):
+	padding_length = 8 - len(data)
+	return "".join(["0" for _ in range(padding_length)]) + data
+
 
 class Frame:
 	FRAME_TYPES = {
@@ -17,16 +30,29 @@ class Frame:
 			"10": "ALTSVC",
 			"12": "ORIGIN"
 		}
-	
-	def __init__(self, frame_type, flags, stream_identifier, payload):
+
+
+	def __init__(self, frame_type, flags, stream_identifier, payload, length=None):
+		if length and not length == len(payload):
+			print("Frame length error")
+			raise Exception
+
 		self.length = len(payload)
 		self.frame_type = frame_type
 		self.frame_type_str = self.FRAME_TYPES[str(self.frame_type)]
-		self.flags = flags
+		if type(flags) == int:
+			self.flags = bin_padding(bin(flags).replace("0b", ""))
+		elif type(flags) == str and is_bin(flags):
+			self.flags = flags
 		self.stream_identifier = stream_identifier
 
-		if self.frame_type == 4:
+		if self.frame_type == 1:
+			self.payload = self.__load_headers_frame(payload)
+		elif self.frame_type == 4:
 			self.payload = self.__load_settings_frame(payload)
+		elif self.frame_type == 8:
+			payload = int.from_bytes(payload, byteorder="big")
+			self.payload = payload
 		else:
 			self.payload = payload
 
@@ -38,17 +64,26 @@ class Frame:
 		flags = raw_frame[4]
 		stream_identifier = int.from_bytes(raw_frame[5:9], byteorder="big")
 		payload = raw_frame[9:]
-		assert(length==len(payload))
-
-		return Frame(frame_type, flags, stream_identifier, payload)
-
+		
+		if len(payload) == length:
+			frame = Frame(frame_type, flags, stream_identifier, payload, length)
+			return [frame]
+		else:
+			payload, next_raw_frame = payload[:length], payload[length:]
+			frame = Frame(frame_type, flags, stream_identifier, payload, len(payload))
+			next_frame = Frame.load_raw_frame(next_raw_frame)
+			frames = [frame]
+			for f in next_frame:
+				frames.append(f)
+			return frames
 	
+
 	def get_raw_frame(self):
 		raw_frame = struct.pack(
 			"!BH2Bi",
 			*divmod(self.length, 1<<16),
 			self.frame_type,
-			self.flags,
+			int(self.flags, 2),
 			self.stream_identifier
 		)
 
@@ -64,10 +99,10 @@ class Frame:
 
 
 	def __str__(self):
-		return "length: %d\r\nframe_type: %s(%d)\r\nflags: %d\r\nstream_identifier: %d\r\npayload: %s"%(
-			self.length,
+		return "----------\r\nframe_type: %s(%d)\r\nlength: %d\r\nflags: 0b%s\r\nstream_identifier: %d\r\npayload: %s"%(
 			self.frame_type_str,
 			self.frame_type,
+			self.length,
 			self.flags,
 			self.stream_identifier,
 			self.payload
@@ -81,3 +116,8 @@ class Frame:
 			frame_list.append(Settings(payload[i:i+6]))
 
 		return frame_list
+
+
+	def __load_headers_frame(self, payload):
+		#headers = Headers.load_raw_frame(payload, self.flags)
+		return payload
