@@ -3,6 +3,7 @@ from threading import Thread
 from ..request import Request
 from ..response import Response
 from ..frame import Frame
+from ..stream.handler import StreamHandler
 
 
 def recv_request(client_sock):
@@ -43,10 +44,6 @@ class Worker(Thread):
 	
 	def start(self):
 		raw_request = recv_request(self.client_sock)
-		if b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n" in raw_request:
-			print("HTTP/2.0 prior knowledge is not supported now")
-			raise Exception
-		
 		request = Request(raw_request)
 
 
@@ -56,37 +53,27 @@ class Worker(Thread):
 				if not switch_protocol(self.client_sock, request):
 					print("Switching protocol error")
 					raise Exception
+				raw_request = recv_request(self.client_sock)
+				request = Request(raw_request)
 			else:
 				send_response(self.client_sock, b"HTTP/1.1 505 HTTP Version Not Supported\r\n\r\n")
 				return
-				
-		
-
-		#Recieve preface
-		raw_request = recv_request(self.client_sock)
-		if not raw_request == b'PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n':
-			print("Preface error")
-			raise Exception
-
-		#Recieve SETTINGS frame
-		raw_request = recv_request(self.client_sock)
-		frame = Frame.load_raw_frame(raw_request)
 
 
-		#Send preface SETTINGS frame
-		frame = Frame(0x4, 0x0, 0x0, b"")
-		if not send_response(self.client_sock, frame.get_raw_frame()):
-			print("Preface send error")
-			raise Exception
+		if request.version == "HTTP/2.0" and request.is_preface:
+			if request.raw_frame:
+				preface_frame = Frame.load_raw_frame(request.raw_frame)
+			else:
+				preface_frame = None
+
+			frame = Frame(0x4, 0x0, 0x0, b"")
+			if not send_response(self.client_sock, frame.get_raw_frame()):
+				print("Preface send error")
+				raise Exception
 
 
-		#Recieve WINDOW_UPDATE frame
-		raw_request = recv_request(self.client_sock)
-		frame = Frame.load_raw_frame(raw_request)
-		assert(frame.frame_type == 8)
-		windows_size = int.from_bytes(frame.payload, "big")
-		print("Window size: ", windows_size)
-
-		#Recieve empty SETTINGS frame
-		raw_request = recv_request(self.client_sock)
-		frame = Frame.load_raw_frame(raw_request)
+			handler = StreamHandler(self.client_sock)
+			if preface_frame:
+				handler.add_preface_frame(preface_frame)
+			handler.run()
+			return
