@@ -45,9 +45,9 @@ class StreamHandler:
 			frames = Frame.load_raw_frame(raw_frame)
 			for frame in frames:
 				print(frame)
-				self.__handle(frame)
-
-			return
+				if not self.__handle(frame):
+					print("Handle error")
+					raise Exception
 
 
 	def __handle(self, frame):
@@ -80,6 +80,8 @@ class StreamHandler:
 		# WINDOW_UPDATE frame
 		elif frame.frame_type == 8:
 			self.window_size = frame.payload
+
+		return True
 
 
 
