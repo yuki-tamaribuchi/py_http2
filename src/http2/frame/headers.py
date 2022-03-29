@@ -211,6 +211,136 @@ class Field:
 			if max_size is None:
 				print("Please specify max_size")
 				raise Exception
+	
+	@classmethod
+	def load_raw_frame(self, raw_frame):
+		def load_next_field(raw_frame):
+			return Field.load_raw_frame(raw_frame)
+
+		def load_name(raw_frame):
+			h_and_name_length_bin = bin_padding(bin(raw_frame[0]).replace("0b", ""))
+			name_h = bool(int(h_and_name_length_bin[0]))
+			name_length = int(h_and_name_length_bin[1:], 2)
+			name = raw_frame[1:1+name_length]
+			return (name, name_h, name_length)
+
+		def load_value(raw_frame):
+			h_and_value_length_bin = bin_padding(bin(raw_frame[0]).replace("0b", ""))
+			value_h = bool(int(h_and_value_length_bin[0]))
+			value_length = int(h_and_value_length_bin[1:], 2)
+			value = raw_frame[1:1+value_length]
+			return (value, value_h, value_length)
+
+		first_byte = bin(raw_frame[0]).replace("0b", "")
+		first_byte = bin_padding(first_byte)
+
+		next_field = None
+
+		# Indexed Header Field
+		if first_byte[0] == "1":
+			index = int(first_byte[1:], 2)
+			field = Field(0, index)
+
+			if len(raw_frame[1:]) != 0:
+				next_field = load_next_field(raw_frame[1:])
+
+		# Literal Header Field and Maximum Dynamic Table Size Change
+		else:
+			# Literal Header Field with Incremental Indexing
+			if first_byte[1] == "1":
+				index = int(first_byte[2:8], 2)
+
+				# New Name
+				if index == 0:
+					name, name_h, name_length = load_name(raw_frame[1:])
+					if name_h:
+						print("Huffman decoder is not implemented now")
+
+					value, value_h, value_length = load_value(raw_frame[2+name_length:])
+					if value_h:
+						print("Huffman decoder is not implemented now")
+					field = Field(2, name=name, name_h=name_h, value=value, value_h=value_h)
+
+					if len(raw_frame[3+name_length+value_length:]) != 0:
+						next_field = load_next_field(raw_frame[3+name_length+value_length:])
+					
+				# Indexed Name
+				else:
+					value, value_h, value_length = load_value(raw_frame[1:])
+					if value_h:
+						print("Huffman decoder is not implemented now")
+					field = Field(1, index=index, value=value, value_h=value_h)
+					
+					if len(raw_frame[2+value_length:]) != 0:
+						next_field = load_next_field(raw_frame[2+value_length:])
+
+
+			# Literal Header Field without Indexing
+			elif first_byte[0:4] == "0000":
+				index = int(first_byte[4:], 2)
+
+				# New Name
+				if index == 0:
+					name, name_h, name_length = load_name(raw_frame[1:])
+					if name_h:
+						print("Huffman decoder is not implemeted now")
+					value, value_h, value_length = load_value(raw_frame[2+name_length:])
+					if value_h:
+						print("Huffman decoder is not implemeted now")
+					field = Field(4, value=value, value_h=value_h, name=name, name_h=name_h)
+
+					if len(raw_frame[3+name_length+value_length:]) != 0:
+						next_field = load_next_field(raw_frame[3+name_length+value_length:])
+				
+				# Indexed Name
+				else:
+					value, value_h, value_length = load_value(raw_frame[1:])
+					if value_h:
+						print("Huffman decoder is not implemented now")
+					field = Field(3, index=index, value=value, value_h=value_h)
+
+					if len(raw_frame[2+value_length:]) != 0:
+						next_field = load_next_field(raw_frame[2+value_length:])
+			
+			# Literal Header Field Never Indexed
+			elif first_byte[0:4] == "0001":
+				index = int(first_byte[4:], 2)
+
+				# New Name
+				if index==0:
+					name, name_h, name_length = load_name(raw_frame[1:])
+					if name_h:
+						print("Huffman decoder is not implemeted now")
+					value, value_h, value_length = load_value(raw_frame[2+name_length:])
+					if value_h:
+						print("Huffman decoder is not implemeted now")
+					field = Field(6, name=name, name_h=name_h, value=value, value_h=value_h)
+
+					if len(raw_frame[3+name_length+value_length:]) != 0:
+						next_field = load_next_field(raw_frame[3+name_length+value_length:])
+				
+				# Indexed Name
+				else:
+					value, value_h, value_length = load_value(raw_frame[1:])
+					if value_h:
+						print("Huffman decoder is not implemeted now")
+					field = Field(5, index=index, value=value, value_h=value_h)
+
+					if len(raw_frame[2+value_length:]) != 0:
+						next_field = load_next_field(raw_frame[2+value_length:])
+
+			# Maximum Dynamic Table Size Change
+			elif first_byte[0:3] == "001":
+				max_size = int(first_byte[3:] ,2)
+				field = Field(7, max_size=max_size)
+
+				if len(raw_frame[1:]) != 0:
+					next_field = load_next_field(raw_frame[1:])
+
+		fields = [field]
+		if next_field:
+			fields += next_field
+		return fields
 
 
 	def get_raw_frame(self):
@@ -232,6 +362,8 @@ class Field:
 			return base + "Index: %d" % (
 				self.index
 			)
+		else:
+			return base
 
 	def __repr__(self):
 		if self.field_type == 0:
@@ -246,7 +378,7 @@ class Field:
 
 
 class Headers:
-	def __init__(self, fields, stream_dependency, weight, priority, padding_length=0, is_end_stream=False, is_end_headers=False):
+	def __init__(self, fields, stream_dependency=None, weight=None, priority=None, padding_length=0, is_end_stream=False, is_end_headers=False):
 		self.fields = fields
 		self.stream_dependency = stream_dependency
 		self.weight = weight
@@ -258,23 +390,7 @@ class Headers:
 	
 	@classmethod
 	def load_raw_frame(cls, raw_frame, flags=None):
-		def load_next_field(raw_frame):
-			return Headers.load_raw_frame(next_raw_frame)
-
-		def load_name(raw_frame):
-			h_and_name_length_bin = bin_padding(bin(raw_frame[0]).replace("0b", ""))
-			name_h = bool(int(h_and_name_length_bin[0]))
-			name_length = int(h_and_name_length_bin[1:], 2)
-			name = raw_frame[1:1+name_length]
-			return (name, name_h, name_length)
 		
-		def load_value(raw_frame):
-			h_and_value_length_bin = bin_padding(bin(raw_frame[0]).replace("0b", ""))
-			value_h = bool(int(h_and_value_length_bin[0]))
-			value_length = int(h_and_value_length_bin[1:])
-			value = raw_frame[1:1+value_h]
-			return (value, value_h)
-
 		if flags:
 			#padded
 			if is_flagged(flags, 4):
@@ -284,98 +400,12 @@ class Headers:
 			if is_flagged(flags, 6):
 				print("Frame with priority is not supported now")
 				raise Exception
+		
+		fields = Field.load_raw_frame(raw_frame)
+		for f in fields:
+			print(f)
+		return Headers(fields)
 
 
-
-		first_byte = bin(raw_frame[0]).replace("0b", "")
-		first_byte = bin_padding(first_byte)
-
-		next_field = None
-
-		# Indexed Header Field
-		if first_byte[0] == "1":
-			index = int(first_byte[1:], 2)
-			field = Field(0, index)
-
-			if len(raw_frame[1:]) > 0:
-				next_raw_frame = raw_frame[1:]
-				next_field = load_next_field(next_raw_frame)
-
-		# Literal Header Field and Maximum Dynamic Table Size Change
-		else:
-			# Literal Header Field with Incremental Indexing
-			if first_byte[1] == "1":
-				index = int(first_byte[3:9], 2)
-				# New Name
-				if index == 0:
-					name, name_h, name_length = load_name(raw_frame[1:])
-					if name_h:
-						print("Huffman decoder is not implemented now")
-
-					value, value_h = load_value(raw_frame[3+name_length:])
-					if value_h:
-						print("Huffman decoder is not implemented now")
-					field = Field(2, name=name, name_h=name_h, value=value, value_h=value_h)
-
-					if len(raw_frame[4+name_length+value_length:]) != 0:
-						next_field = load_next_field(raw_frame[4+name_length+value_length:])
-					
-				# Indexed Name
-				else:
-					value, value_h = load_value(raw_frame[1:])
-					if value_h:
-						print("Huffman decoder is not implemented now")
-					field = Field(1, index=index, value = value, value_h=value_h)
-
-			# Literal Header Field without Indexing
-			elif first_byte[0:4] == "0000":
-				index = int(first_byte[4:], 2)
-
-				# New Name
-				if index == 0:
-					name, name_h, name_length = load_name(raw_frame[1:])
-					if name_h:
-						print("Huffman decoder is not implemeted now")
-					value, value_h = load_value(raw_frame[2+name_length:])
-					if value_h:
-						print("Huffman decoder is not implemeted now")
-					field = Field(4, value=value, value_h=value_h, name=name, name_h=name_h)
-				
-				# Indexed Name
-				else:
-					value, value_h = load_value(raw_frame[1:])
-					if value_h:
-						print("Huffman decoder is not implemented now")
-					field = Field(3, index=index, value=value, value_h=value_h)
-			
-			# Literal Header Field Never Indexed
-			elif first_byte[0:4] == "0001":
-				index = int(first_byte[4:], 2)
-
-				# New Name
-				if index==0:
-					name, name_h, name_length = load_name(raw_frame[1:])
-					if name_h:
-						print("Huffman decoder is not implemeted now")
-					value, value_h = load_value(raw_frame[2+name_length:])
-					if value_h:
-						print("Huffman decoder is not implemeted now")
-					field = Field(6, name=name, name_h=name_h, value=value, value_h=value_h)
-				
-				# Indexed Name
-				else:
-					value, value_h = load_value(raw_frame[1:])
-					if value_h:
-						print("Huffman decoder is not implemeted now")
-					field = Field(5, index=index, value=value, value_h=value_h)
-
-			# Maximum Dynamic Table Size Change
-			elif first_byte[0:3] == "001":
-				max_size = int(first_byte[3:] ,2)
-				field = Field(7, max_size=max_size)
-
-
-		fields = [field]
-		if next_field:
-			fields += next_field
-		return fields
+	def __repr__(self):
+		return "<Headers object that has " + str(len(self.fields)) + " fields>"
