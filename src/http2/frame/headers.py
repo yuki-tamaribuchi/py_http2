@@ -179,6 +179,7 @@ class Field:
 	def __init__(self, field_type:int, index=None, name=None, name_h=None, value=None, value_h=None, max_size=None):
 		if index == 0:
 			print("Index must be 1 or over")
+
 		self.field_type = field_type
 		self.field_type_str = self.FIELD_TYPES[str(self.field_type)]
 
@@ -213,9 +214,9 @@ class Field:
 
 
 	def get_raw_frame(self):
-		if field_type == 0:
-			field_byte_str = "0" + bin(self.index).replace("0b", "")
-			return bytes(int(field_byte_str), 2)
+		if self.field_type == 0:
+			field_byte_str = "0" + bin_padding(bin(self.index).replace("0b", ""), 7)
+			return bytes(int(field_byte_str, 2))
 		else:
 			print("Type %s is not supported now"%(self.field_type_str))
 			raise Exception
@@ -245,7 +246,8 @@ class Field:
 
 
 class Headers:
-	def __init__(self, stream_dependency, weight, priority, padding_length=0, is_end_stream=False, is_end_headers=False):
+	def __init__(self, fields, stream_dependency, weight, priority, padding_length=0, is_end_stream=False, is_end_headers=False):
+		self.fields = fields
 		self.stream_dependency = stream_dependency
 		self.weight = weight
 		self.priority = priority
