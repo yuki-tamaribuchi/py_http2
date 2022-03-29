@@ -217,24 +217,40 @@ class Field:
 		def load_next_field(raw_frame):
 			return Field.load_raw_frame(raw_frame)
 
+		def is_all_flagged(bits):
+			for b in bits:
+				if not b == 1:
+					return False
+			return True
+
 		def load_name(raw_frame):
+			current_byte_idx = 0
 			h_and_name_length_bin = bin_padding(bin(raw_frame[0]).replace("0b", ""))
 			name_h = bool(int(h_and_name_length_bin[0]))
-			name_length = int(h_and_name_length_bin[1:], 2)
+			if is_all_flagged(h_and_name_length_bin[1:]):
+				name_length, current_byte_idx = calc_multi_byte_value(raw_frame[1:])
+			else:
+				name_length = int(h_and_name_length_bin[1:], 2)
 			name = raw_frame[1:1+name_length]
-			return (name, name_h, name_length)
+			return (name, name_h, name_length, current_byte_idx)
 
 		def load_value(raw_frame):
+			current_byte_idx = 0
 			h_and_value_length_bin = bin_padding(bin(raw_frame[0]).replace("0b", ""))
 			value_h = bool(int(h_and_value_length_bin[0]))
-			value_length = int(h_and_value_length_bin[1:], 2)
+			if is_all_flagged(h_and_value_length_bin[1:]):
+				value_length, current_byte_idx = calc_multi_byte_value(raw_frame[1:])
+			else:
+				value_length = int(h_and_value_length_bin[1:], 2)
 			value = raw_frame[1:1+value_length]
-			return (value, value_h, value_length)
+			return (value, value_h, value_length, current_byte_idx)
 
 		first_byte = bin(raw_frame[0]).replace("0b", "")
 		first_byte = bin_padding(first_byte)
 
 		current_byte_idx = 0
+		name_current_byte_idx = 0
+		value_current_byte_idx = 0
 		next_field = None
 
 		def calc_multi_byte_value(raw_frame):
@@ -268,27 +284,27 @@ class Field:
 
 				# New Name
 				if index == 0:
-					name, name_h, name_length = load_name(raw_frame[1:])
+					name, name_h, name_length, name_current_byte_idx = load_name(raw_frame[1:])
 					if name_h:
 						print("Huffman decoder is not implemented now")
 
-					value, value_h, value_length = load_value(raw_frame[2+name_length:])
+					value, value_h, value_length, value_current_byte_idx = load_value(raw_frame[2+name_length+name_current_byte_idx:])
 					if value_h:
 						print("Huffman decoder is not implemented now")
 					field = Field(2, name=name, name_h=name_h, value=value, value_h=value_h)
 
 					if len(raw_frame[3+name_length+value_length:]) != 0:
-						next_field = load_next_field(raw_frame[3+name_length+value_length:])
+						next_field = load_next_field(raw_frame[3+name_length+value_length+name_current_byte_idx+value_current_byte_idx:])
 					
 				# Indexed Name
 				else:
-					value, value_h, value_length = load_value(raw_frame[1:])
+					value, value_h, value_length, value_current_byte_idx = load_value(raw_frame[1:])
 					if value_h:
 						print("Huffman decoder is not implemented now")
 					field = Field(1, index=index, value=value, value_h=value_h)
 					
 					if len(raw_frame[2+value_length:]) != 0:
-						next_field = load_next_field(raw_frame[2+value_length:])
+						next_field = load_next_field(raw_frame[2+value_length+value_current_byte_idx:])
 
 
 			# Literal Header Field without Indexing
@@ -297,26 +313,26 @@ class Field:
 
 				# New Name
 				if index == 0:
-					name, name_h, name_length = load_name(raw_frame[1:])
+					name, name_h, name_length, name_current_byte_idx = load_name(raw_frame[1:])
 					if name_h:
 						print("Huffman decoder is not implemeted now")
-					value, value_h, value_length = load_value(raw_frame[2+name_length:])
+					value, value_h, value_length, value_current_byte_idx = load_value(raw_frame[2+name_length+name_current_byte_idx:])
 					if value_h:
 						print("Huffman decoder is not implemeted now")
 					field = Field(4, value=value, value_h=value_h, name=name, name_h=name_h)
 
 					if len(raw_frame[3+name_length+value_length:]) != 0:
-						next_field = load_next_field(raw_frame[3+name_length+value_length:])
+						next_field = load_next_field(raw_frame[3+name_length+value_length+name_current_byte_idx+value_current_byte_idx:])
 				
 				# Indexed Name
 				else:
-					value, value_h, value_length = load_value(raw_frame[1:])
+					value, value_h, value_length, value_current_byte_idx = load_value(raw_frame[1:])
 					if value_h:
 						print("Huffman decoder is not implemented now")
 					field = Field(3, index=index, value=value, value_h=value_h)
 
 					if len(raw_frame[2+value_length:]) != 0:
-						next_field = load_next_field(raw_frame[2+value_length:])
+						next_field = load_next_field(raw_frame[2+value_length+value_current_byte_idx:])
 			
 			# Literal Header Field Never Indexed
 			elif first_byte[0:4] == "0001":
@@ -324,34 +340,37 @@ class Field:
 
 				# New Name
 				if index==0:
-					name, name_h, name_length = load_name(raw_frame[1:])
+					name, name_h, name_length, name_current_byte_idx = load_name(raw_frame[1:])
 					if name_h:
 						print("Huffman decoder is not implemeted now")
-					value, value_h, value_length = load_value(raw_frame[2+name_length:])
+					value, value_h, value_length, value_current_byte_idx = load_value(raw_frame[2+name_length+name_current_byte_idx:])
 					if value_h:
 						print("Huffman decoder is not implemeted now")
 					field = Field(6, name=name, name_h=name_h, value=value, value_h=value_h)
 
 					if len(raw_frame[3+name_length+value_length:]) != 0:
-						next_field = load_next_field(raw_frame[3+name_length+value_length:])
+						next_field = load_next_field(raw_frame[3+name_length+value_length+name_current_byte_idx+value_current_byte_idx:])
 				
 				# Indexed Name
 				else:
-					value, value_h, value_length = load_value(raw_frame[1:])
+					value, value_h, value_length, value_current_byte_idx = load_value(raw_frame[1:])
 					if value_h:
 						print("Huffman decoder is not implemeted now")
 					field = Field(5, index=index, value=value, value_h=value_h)
 
 					if len(raw_frame[2+value_length:]) != 0:
-						next_field = load_next_field(raw_frame[2+value_length:])
+						next_field = load_next_field(raw_frame[2+value_length+value_current_byte_idx:])
 
 			# Maximum Dynamic Table Size Change
 			elif first_byte[0:3] == "001":
-				max_size = int(first_byte[3:] ,2)
+				if is_all_flagged(first_byte[3:]):
+					max_size, current_byte_idx = calc_multi_byte_value(raw_frame[1:])
+				else:
+					max_size = int(first_byte[3:] ,2)
 				field = Field(7, max_size=max_size)
 
 				if len(raw_frame[1:]) != 0:
-					next_field = load_next_field(raw_frame[1:])
+					next_field = load_next_field(raw_frame[1+current_byte_idx:])
 
 		fields = [field]
 		if next_field:
