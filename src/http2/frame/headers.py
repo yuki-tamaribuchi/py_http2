@@ -234,15 +234,31 @@ class Field:
 		first_byte = bin(raw_frame[0]).replace("0b", "")
 		first_byte = bin_padding(first_byte)
 
+		current_byte_idx = 0
 		next_field = None
+
+		def calc_multi_byte_value(raw_frame):
+			current_byte_idx = 0
+			value_bin = ""
+			while True:
+				current_byte = bin_padding(bin(raw_frame[current_byte_idx]).replace("0b", ""))
+				value_bin = current_byte[1:] + value_bin
+				current_byte_idx += 1
+				if current_byte[0] == "0":
+					break
+			value = int(value_bin, 2)
+			return (value, current_byte_idx)
 
 		# Indexed Header Field
 		if first_byte[0] == "1":
-			index = int(first_byte[1:], 2)
+			if first_byte[1:] == "1111111":
+				index, current_byte_idx = calc_multi_byte_value(raw_frame[1:])
+			else:
+				index = int(first_byte[1:], 2)
 			field = Field(0, index)
 
 			if len(raw_frame[1:]) != 0:
-				next_field = load_next_field(raw_frame[1:])
+				next_field = load_next_field(raw_frame[1+current_byte_idx:])
 
 		# Literal Header Field and Maximum Dynamic Table Size Change
 		else:
@@ -402,8 +418,6 @@ class Headers:
 				raise Exception
 		
 		fields = Field.load_raw_frame(raw_frame)
-		for f in fields:
-			print(f)
 		return Headers(fields)
 
 
