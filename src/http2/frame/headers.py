@@ -2,6 +2,7 @@ import struct
 
 from ..utils.flags import is_flagged
 from ..utils.bin import bin_padding
+from ..utils.huffman import decode
 
 class Field:
 	FIELD_TYPES = {
@@ -197,6 +198,7 @@ class Field:
 				print("Please specify name_h")
 				raise Exception
 			self.name = name
+			self.name_h = name_h
 		
 		if self.field_type in [1, 2, 3, 4, 5, 6]:
 			if value is None:
@@ -206,6 +208,7 @@ class Field:
 				print("Please specify value_h")
 				raise Exception
 			self.value = value
+			self.value_h = value_h
 		
 		if self.field_type == 7:
 			if max_size is None:
@@ -228,7 +231,7 @@ class Field:
 			h_and_name_length_bin = bin_padding(bin(raw_frame[0]).replace("0b", ""))
 			name_h = bool(int(h_and_name_length_bin[0]))
 			if is_all_flagged(h_and_name_length_bin[1:]):
-				name_length, current_byte_idx = calc_multi_byte_value(raw_frame[1:])
+				name_length, current_byte_idx = calc_multi_byte_value(raw_frame[1:], len(h_and_name_length_bin[1:]))
 			else:
 				name_length = int(h_and_name_length_bin[1:], 2)
 			name = raw_frame[1:1+name_length]
@@ -239,7 +242,7 @@ class Field:
 			h_and_value_length_bin = bin_padding(bin(raw_frame[0]).replace("0b", ""))
 			value_h = bool(int(h_and_value_length_bin[0]))
 			if is_all_flagged(h_and_value_length_bin[1:]):
-				value_length, current_byte_idx = calc_multi_byte_value(raw_frame[1:])
+				value_length, current_byte_idx = calc_multi_byte_value(raw_frame[1:], len(h_and_value_length_bin[1:]))
 			else:
 				value_length = int(h_and_value_length_bin[1:], 2)
 			value = raw_frame[1:1+value_length]
@@ -249,11 +252,13 @@ class Field:
 		first_byte = bin_padding(first_byte)
 
 		current_byte_idx = 0
+		index_current_byte_idx = 0
 		name_current_byte_idx = 0
 		value_current_byte_idx = 0
 		next_field = None
 
-		def calc_multi_byte_value(raw_frame):
+		def calc_multi_byte_value(raw_frame, prefix_bit_length):
+			prefix_value = 2 ** prefix_bit_length - 1
 			current_byte_idx = 0
 			value_bin = ""
 			while True:
@@ -262,13 +267,14 @@ class Field:
 				current_byte_idx += 1
 				if current_byte[0] == "0":
 					break
-			value = int(value_bin, 2)
+			value = int(value_bin, 2) + prefix_value
 			return (value, current_byte_idx)
+
 
 		# Indexed Header Field
 		if first_byte[0] == "1":
 			if first_byte[1:] == "1111111":
-				index, current_byte_idx = calc_multi_byte_value(raw_frame[1:])
+				index, current_byte_idx = calc_multi_byte_value(raw_frame[1:], len(first_byte[1:]))
 			else:
 				index = int(first_byte[1:], 2)
 			field = Field(0, index)
@@ -280,96 +286,105 @@ class Field:
 		else:
 			# Literal Header Field with Incremental Indexing
 			if first_byte[1] == "1":
-				index = int(first_byte[2:8], 2)
+				if first_byte[2:] == "111111":
+					index, index_current_byte_idx = calc_multi_byte_value(raw_frame[1:], len(first_byte[2:]))
+				else:
+					index = int(first_byte[2:], 2)
 
 				# New Name
 				if index == 0:
-					name, name_h, name_length, name_current_byte_idx = load_name(raw_frame[1:])
+					name, name_h, name_length, name_current_byte_idx = load_name(raw_frame[1+index_current_byte_idx:])
 					if name_h:
-						print("Huffman decoder is not implemented now")
+						name = decode(name, self.STATIC_HUFFMAN_REVERSE_TABLE)
 
-					value, value_h, value_length, value_current_byte_idx = load_value(raw_frame[2+name_length+name_current_byte_idx:])
+					value, value_h, value_length, value_current_byte_idx = load_value(raw_frame[2+index_current_byte_idx+name_length+name_current_byte_idx:])
 					if value_h:
-						print("Huffman decoder is not implemented now")
+						value = decode(value, self.STATIC_HUFFMAN_REVERSE_TABLE)
 					field = Field(2, name=name, name_h=name_h, value=value, value_h=value_h)
 
 					if len(raw_frame[3+name_length+value_length:]) != 0:
-						next_field = load_next_field(raw_frame[3+name_length+value_length+name_current_byte_idx+value_current_byte_idx:])
+						next_field = load_next_field(raw_frame[3+index_current_byte_idx+name_length+value_length+name_current_byte_idx+value_current_byte_idx:])
 					
 				# Indexed Name
 				else:
-					value, value_h, value_length, value_current_byte_idx = load_value(raw_frame[1:])
+					value, value_h, value_length, value_current_byte_idx = load_value(raw_frame[1+index_current_byte_idx:])
 					if value_h:
-						print("Huffman decoder is not implemented now")
+						value = decode(value, self.STATIC_HUFFMAN_REVERSE_TABLE)
 					field = Field(1, index=index, value=value, value_h=value_h)
 					
-					if len(raw_frame[2+value_length:]) != 0:
-						next_field = load_next_field(raw_frame[2+value_length+value_current_byte_idx:])
+					if len(raw_frame[2+index_current_byte_idx+value_length+value_current_byte_idx:]) != 0:
+						next_field = load_next_field(raw_frame[2+index_current_byte_idx+value_length+value_current_byte_idx:])
 
 
 			# Literal Header Field without Indexing
-			elif first_byte[0:4] == "0000":
-				index = int(first_byte[4:], 2)
+			elif first_byte[1:4] == "000":
+				if first_byte[4:] == "1111":
+					index, index_current_byte_idx = calc_multi_byte_value(raw_frame[1:], len(first_byte[4:]))
+				else:
+					index = int(first_byte[4:], 2)
 
 				# New Name
 				if index == 0:
-					name, name_h, name_length, name_current_byte_idx = load_name(raw_frame[1:])
+					name, name_h, name_length, name_current_byte_idx = load_name(raw_frame[1+index_current_byte_idx:])
 					if name_h:
-						print("Huffman decoder is not implemeted now")
-					value, value_h, value_length, value_current_byte_idx = load_value(raw_frame[2+name_length+name_current_byte_idx:])
+						name = decode(name, self.STATIC_HUFFMAN_REVERSE_TABLE)
+					value, value_h, value_length, value_current_byte_idx = load_value(raw_frame[2+index_current_byte_idx+name_length+name_current_byte_idx:])
 					if value_h:
-						print("Huffman decoder is not implemeted now")
+						value = decode(value, self.STATIC_HUFFMAN_REVERSE_TABLE)
 					field = Field(4, value=value, value_h=value_h, name=name, name_h=name_h)
 
-					if len(raw_frame[3+name_length+value_length:]) != 0:
-						next_field = load_next_field(raw_frame[3+name_length+value_length+name_current_byte_idx+value_current_byte_idx:])
+					if len(raw_frame[3+index_current_byte_idx+name_length+value_length+name_current_byte_idx+value_current_byte_idx:]) != 0:
+						next_field = load_next_field(raw_frame[3+index_current_byte_idx+name_length+value_length+name_current_byte_idx+value_current_byte_idx:])
 				
 				# Indexed Name
 				else:
-					value, value_h, value_length, value_current_byte_idx = load_value(raw_frame[1:])
+					value, value_h, value_length, value_current_byte_idx = load_value(raw_frame[1+index_current_byte_idx:])
 					if value_h:
-						print("Huffman decoder is not implemented now")
+						value = decode(value, self.STATIC_HUFFMAN_REVERSE_TABLE)
 					field = Field(3, index=index, value=value, value_h=value_h)
 
-					if len(raw_frame[2+value_length:]) != 0:
-						next_field = load_next_field(raw_frame[2+value_length+value_current_byte_idx:])
+					if len(raw_frame[2+index_current_byte_idx+value_length+value_current_byte_idx:]) != 0:
+						next_field = load_next_field(raw_frame[2+index_current_byte_idx+value_length+value_current_byte_idx:])
 			
 			# Literal Header Field Never Indexed
-			elif first_byte[0:4] == "0001":
-				index = int(first_byte[4:], 2)
+			elif first_byte[1:4] == "001":
+				if first_byte[4:] == "1111":
+					index, index_current_byte_idx = calc_multi_byte_value(raw_frame[1:], len(first_byte[4:]))
+				else:
+					index = int(first_byte[4:], 2)
 
 				# New Name
 				if index==0:
-					name, name_h, name_length, name_current_byte_idx = load_name(raw_frame[1:])
+					name, name_h, name_length, name_current_byte_idx = load_name(raw_frame[1+index_current_byte_idx:])
 					if name_h:
-						print("Huffman decoder is not implemeted now")
-					value, value_h, value_length, value_current_byte_idx = load_value(raw_frame[2+name_length+name_current_byte_idx:])
+						name = decode(name, self.STATIC_HUFFMAN_REVERSE_TABLE)
+					value, value_h, value_length, value_current_byte_idx = load_value(raw_frame[2+index_current_byte_idx+name_length+name_current_byte_idx:])
 					if value_h:
-						print("Huffman decoder is not implemeted now")
+						value = decode(value, self.STATIC_HUFFMAN_REVERSE_TABLE)
 					field = Field(6, name=name, name_h=name_h, value=value, value_h=value_h)
 
-					if len(raw_frame[3+name_length+value_length:]) != 0:
-						next_field = load_next_field(raw_frame[3+name_length+value_length+name_current_byte_idx+value_current_byte_idx:])
+					if len(raw_frame[3+index_current_byte_idx+name_length+value_length+name_current_byte_idx+value_current_byte_idx:]) != 0:
+						next_field = load_next_field(raw_frame[3+index_current_byte_idx+name_length+value_length+name_current_byte_idx+value_current_byte_idx:])
 				
 				# Indexed Name
 				else:
-					value, value_h, value_length, value_current_byte_idx = load_value(raw_frame[1:])
+					value, value_h, value_length, value_current_byte_idx = load_value(raw_frame[1+index_current_byte_idx:])
 					if value_h:
-						print("Huffman decoder is not implemeted now")
+						value = decode(value, self.STATIC_HUFFMAN_REVERSE_TABLE)
 					field = Field(5, index=index, value=value, value_h=value_h)
 
-					if len(raw_frame[2+value_length:]) != 0:
-						next_field = load_next_field(raw_frame[2+value_length+value_current_byte_idx:])
+					if len(raw_frame[2+index_current_byte_idx+value_length+value_current_byte_idx:]) != 0:
+						next_field = load_next_field(raw_frame[2+index_current_byte_idx+value_length+value_current_byte_idx:])
 
 			# Maximum Dynamic Table Size Change
 			elif first_byte[0:3] == "001":
 				if is_all_flagged(first_byte[3:]):
-					max_size, current_byte_idx = calc_multi_byte_value(raw_frame[1:])
+					max_size, current_byte_idx = calc_multi_byte_value(raw_frame[1:], len(first_byte[3:]))
 				else:
 					max_size = int(first_byte[3:] ,2)
 				field = Field(7, max_size=max_size)
 
-				if len(raw_frame[1:]) != 0:
+				if len(raw_frame[1+current_byte_idx:]) != 0:
 					next_field = load_next_field(raw_frame[1+current_byte_idx:])
 
 		fields = [field]
@@ -392,13 +407,25 @@ class Field:
 			self.field_type_str,
 			self.field_type
 		)
+		if "index" in self.__dict__:
+			base += "Index: %d\r\n"%(self.index)
+
+		if "name_h" in self.__dict__:
+			base += "Name Huffman: %d\r\n"%(int(self.name_h))
+
+		if "name" in self.__dict__:
+			base += "Name: %s\r\n"%(self.name)
 		
-		if self.field_type == 0:
-			return base + "Index: %d" % (
-				self.index
-			)
-		else:
-			return base
+		if "value_h" in self.__dict__:
+			base += "Value Huffman: %d\r\n"%(int(self.value_h))
+
+		if "value" in self.__dict__:
+			base += "Value: %s\r\n"%(self.value)
+
+		if "max_size" in self.__dict__:
+			base += "Max size: %d\r\n"%(self.max_size)
+		return base
+
 
 	def __repr__(self):
 		if self.field_type == 0:
