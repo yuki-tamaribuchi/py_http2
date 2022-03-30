@@ -3,16 +3,7 @@ import struct
 from .settings import Settings
 from .headers import Headers
 
-
-def is_bin(data):
-	for d in data:
-		if not d in [0, 1]:
-			return False
-	return True
-
-def bin_padding(data):
-	padding_length = 8 - len(data)
-	return "".join(["0" for _ in range(padding_length)]) + data
+from ..utils.bin import is_bin, bin_padding
 
 
 class Frame:
@@ -73,10 +64,9 @@ class Frame:
 			frame = Frame(frame_type, flags, stream_identifier, payload, len(payload))
 			next_frame = Frame.load_raw_frame(next_raw_frame)
 			frames = [frame]
-			for f in next_frame:
-				frames.append(f)
+			if next_frame:
+				frames += next_frame
 			return frames
-	
 
 	def get_raw_frame(self):
 		raw_frame = struct.pack(
@@ -119,5 +109,5 @@ class Frame:
 
 
 	def __load_headers_frame(self, payload):
-		#headers = Headers.load_raw_frame(payload, self.flags)
-		return payload
+		headers = Headers.load_raw_frame(payload, self.flags)
+		return headers
