@@ -42,9 +42,10 @@ class StreamHandler:
 	def run(self):
 		while True:
 			raw_frame = recv_request(self.client_sock)
+			if raw_frame == b"":
+				break
 			frames = Frame.load_raw_frame(raw_frame)
 			for frame in frames:
-				print(frame)
 				if not self.__handle(frame):
 					print("Handle error")
 					raise Exception
