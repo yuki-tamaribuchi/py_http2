@@ -1,5 +1,6 @@
 from ..frame import Frame
 from ..stream.stream import Stream
+from ..utils.flags import is_flagged
 
 
 def recv_request(client_sock):
@@ -19,14 +20,16 @@ class StreamHandler:
 		"reserved_local": 1,
 		"reserved_remote": 2,
 		"half_closed_remote": 3,
-		"half_clised_local": 4
+		"half_closed_local": 4,
+		"closed": 5
 	}
 	
 	def __init__(self, client_sock):
 		self.client_sock = client_sock
-		self.stream_instance_list = []
+		self.request_stream_list = []
+		self.response_stream_list = []
 		self.max_current_streams = None
-		self.current_max_stream_identification = 1
+		self.current_max_stream_identification = None
 		self.window_size = None
 		self.max_window_size = None
 		self.header_table_size = None
@@ -57,7 +60,13 @@ class StreamHandler:
 			pass
 
 		# HEADERS frame
-		#elif frame.frame_type == 1:
+		elif frame.frame_type == 1:
+			if is_flagged(frame.flags, 1):
+				state = self.STREAM_STATES["half_closed_remote"]
+			else:
+				state = self.STREAM_STATES["open"]
+			stream = Stream(state, frame.stream_identifier)
+			self.__add_request_stream_to_list(stream)
 
 
 		# SETTINGS frame
@@ -86,8 +95,12 @@ class StreamHandler:
 
 
 
-	def __add_stream(self, stream_instance):
-		self.stream_instance_list.append(stream_instance)
+	def __add_request_stream_to_list(self, stream):
+		self.request_stream_list.append(stream)
+
+	
+	def __add_response_stream_to_list(self, stream):
+		self.response_stream_list.append(stream)
 
 	
 	def __recieve_frame(self, frame):
