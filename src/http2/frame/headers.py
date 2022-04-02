@@ -456,8 +456,9 @@ class Headers:
 		if flags:
 			#padded
 			if is_flagged(flags, 4):
-				print("Padded frame process is not implemented now")
-				raise Exception
+				padding_length = raw_frame[0]
+				raw_frame = raw_frame[1:-padding_length]
+
 			#priority
 			if is_flagged(flags, 6):
 				print("Frame with priority is not supported now")
