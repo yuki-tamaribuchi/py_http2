@@ -66,8 +66,9 @@ class StreamHandler:
 			else:
 				state = self.STREAM_STATES["open"]
 			stream = Stream(state, frame.stream_identifier)
-			self.__add_request_stream_to_list(stream)
 
+			stream.add_headers_to_table(frame.payload)
+			self.__add_request_stream_to_list(stream)
 
 		# SETTINGS frame
 		elif frame.frame_type == 4:
@@ -93,7 +94,11 @@ class StreamHandler:
 
 		return True
 
-
+	def __get_request_stream_by_id(self, id):
+		for stream in self.request_stream_list:
+			if stream.stream_identifier == id:
+				return stream
+		return None
 
 	def __add_request_stream_to_list(self, stream):
 		self.request_stream_list.append(stream)
