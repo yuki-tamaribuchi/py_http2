@@ -63,14 +63,33 @@ class Table:
 		"61": {"name": "www-authenticate", "value": ""}
 	}
 
-	def __init__(self, max_table_size):
-		self.max_table_size = max_table_size
+	def __init__(self):
+		self.max_table_size = 4096
 		self.current_table_size = 0
 		self.used_static_field_indexes = []
 		self.dynamic_fileds = {}
+		self.fields_without_indexing = {}
+
+	def set_max_table_size(self, field):
+		self.max_table_size = field.max_size
 
 	def add_static_field(self, field):
-		pass
+		self.used_static_field_indexes.append(field.index)
+
+	def add_fields_without_indexing(self, field):
+		if field.field_type == 3:
+			self.fields_without_indexing[self.STATIC_HEADER_FIELDS[str(field.index)]["name"]] = field.value
+		else:
+			self.fields_without_indexing[field.name] = field.value
 
 	def add_dynamic_field(self, field):
-		pass
+		new_dynamic_fields = {}
+		if field.field_type == 1:
+			new_dynamic_fields["62"] = {"name": self.STATIC_HEADER_FIELDS[str(field.index)]["name"], "value": field.value}
+		else:
+			new_dynamic_fields["62"] = {"name": field.name, "value": field.value}
+
+		if len(self.dynamic_fileds)>0:
+			for k, v in self.dynamic_fileds.items():
+				new_dynamic_fields[str(int(k)+1)] = v
+		self.dynamic_fileds = new_dynamic_fields
