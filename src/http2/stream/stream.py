@@ -7,18 +7,19 @@ class Stream:
 		self.priority = priority
 		self.stream_dependency = stream_dependency
 		self.weight = weight
-		self.headers_table = Table()
+		self.request_headers_table = Table()
+		self.response_headers_table = Table()
 	
-	def add_headers_to_table(self, headers):
+	def add_request_headers_to_table(self, headers):
 		for field in headers.fields:
 			if field.field_type == 0:
-				self.headers_table.add_static_field(field)
+				self.request_headers_table.add_static_field(field)
 			elif field.field_type in [1, 2]:
-				self.headers_table.add_dynamic_field(field)
+				self.request_headers_table.add_dynamic_field(field)
 			elif field.field_type in [3, 4]:
-				self.headers_table.add_fields_without_indexing(field)
+				self.request_headers_table.add_fields_without_indexing(field)
 			elif field.field_type in [5, 6]:
 				print("Literal Header Field Never Indexed is not implemented")
 				raise Exception
 			elif field.field_type == 7:
-				self.headers_table.set_max_table_size(field)
+				self.request_headers_table.set_max_table_size(field)
