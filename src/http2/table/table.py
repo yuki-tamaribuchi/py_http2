@@ -93,3 +93,25 @@ class Table:
 			for k, v in self.dynamic_fileds.items():
 				new_dynamic_fields[str(int(k)+1)] = v
 		self.dynamic_fileds = new_dynamic_fields
+
+
+	def create_headers_dict(self):
+		headers_dict = {}
+
+		if self.used_static_field_indexes:
+			for field in self.used_static_field_indexes:
+				k = self.STATIC_HEADER_FIELDS[str(field)]["name"]
+				v = self.STATIC_HEADER_FIELDS[str(field)]["value"]
+				headers_dict[k] = v
+
+		if self.dynamic_fileds:
+			for field in self.dynamic_fileds.values():
+				k = field["name"]
+				v = field["value"]
+				headers_dict[k] = v
+
+		if self.fields_without_indexing:
+			for k, v in self.fields_without_indexing.items():
+				headers_dict[k] = v
+		
+		print(headers_dict)
