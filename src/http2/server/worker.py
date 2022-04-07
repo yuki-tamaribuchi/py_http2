@@ -44,7 +44,7 @@ class Worker(Thread):
 	
 	def start(self):
 		raw_request = recv_request(self.client_sock)
-		request = Request(raw_request)
+		request = Request.load_raw_request(raw_request)
 
 
 		#Switch Protocol if request http version 1.1
@@ -54,7 +54,7 @@ class Worker(Thread):
 					print("Switching protocol error")
 					raise Exception
 				raw_request = recv_request(self.client_sock)
-				request = Request(raw_request)
+				request = Request.load_raw_request(raw_request)
 			else:
 				send_response(self.client_sock, b"HTTP/1.1 505 HTTP Version Not Supported\r\n\r\n")
 				return
