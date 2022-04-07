@@ -1,3 +1,6 @@
+from ..request import Request
+
+
 class Table:
 	STATIC_HEADER_FIELDS = {
 		"1": {"name": ":authority", "value": ""},
@@ -95,7 +98,7 @@ class Table:
 		self.dynamic_fileds = new_dynamic_fields
 
 
-	def create_headers_dict(self):
+	def __create_headers_dict(self):
 		headers_dict = {}
 
 		if self.used_static_field_indexes:
@@ -114,4 +117,32 @@ class Table:
 			for k, v in self.fields_without_indexing.items():
 				headers_dict[k] = v
 		
-		print(headers_dict)
+		return headers_dict
+
+	def create_request_instance(self):
+
+		headers_dict = self.__create_headers_dict()
+		
+		if ":authority" in headers_dict:
+			authority = headers_dict.pop(":authority")
+		
+		if ":scheme" in headers_dict:
+			scheme = headers_dict.pop(":scheme")
+		
+		if ":method" in headers_dict:
+			method = headers_dict.pop(":method")
+
+		if ":path" in headers_dict:
+			uri = headers_dict.pop(":path")
+
+		options = headers_dict
+
+
+		return Request(
+			version="HTTP/2.0",
+			authority=authority,
+			scheme=scheme,
+			method=method,
+			uri=uri,
+			options=options,
+		)
