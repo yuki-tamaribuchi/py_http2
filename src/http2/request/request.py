@@ -66,3 +66,8 @@ class Request:
 			print("This request is not supported")
 			print(raw_request)
 			raise Exception
+
+
+	def __str__(self):
+		base = super().__str__()
+		return  base[:-1] + ", uri: %s>"%(self.uri)
