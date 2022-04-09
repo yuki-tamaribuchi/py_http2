@@ -24,8 +24,9 @@ class StreamHandler:
 		"closed": 5
 	}
 	
-	def __init__(self, client_sock):
+	def __init__(self, client_sock, request_queue):
 		self.client_sock = client_sock
+		self.request_queue = request_queue
 		self.request_stream_list = []
 		self.response_stream_list = []
 		self.max_current_streams = None
@@ -67,7 +68,19 @@ class StreamHandler:
 				state = self.STREAM_STATES["open"]
 			stream = Stream(state, frame.stream_identifier)
 
-			stream.add_headers_to_table(frame.payload)
+			stream.add_request_headers_to_table(frame.payload)
+
+
+
+
+
+			request = stream.request_headers_table.create_request_instance()
+			self.request_queue.put((request, stream.stream_identifier))
+
+
+
+
+
 			self.__add_request_stream_to_list(stream)
 
 		# SETTINGS frame
