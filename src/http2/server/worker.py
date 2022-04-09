@@ -1,4 +1,5 @@
 from threading import Thread
+from queue import Queue
 
 from ..request import Request
 from ..response import Response
@@ -39,10 +40,23 @@ def switch_protocol(client_sock, request):
 
 
 class Worker(Thread):
-	def __init__(self, client_sock):
+	def __init__(self, client_sock, app):
 		self.client_sock = client_sock
-	
+		self.app = app
+		self.request_queue = Queue()
+		self.response_queue = Queue()
+
 	def start(self):
+		
+		work_thread = Thread(target=self.__work)
+		call_app_thread = Thread(target=self.__call_app)
+		
+		work_thread.start()
+		call_app_thread.start()
+
+		return
+
+	def __work(self):
 		raw_request = recv_request(self.client_sock)
 		request = Request.load_raw_request(raw_request)
 
@@ -72,8 +86,15 @@ class Worker(Thread):
 				raise Exception
 
 
-			handler = StreamHandler(self.client_sock)
+			handler = StreamHandler(self.client_sock, self.request_queue)
 			if preface_frame:
 				handler.add_preface_frame(preface_frame)
 			handler.run()
 			return
+
+
+	def __call_app(self):
+		while True:
+			if not self.request_queue.empty():
+				request, stream_identifier = self.request_queue.get()
+				self.app(request)
