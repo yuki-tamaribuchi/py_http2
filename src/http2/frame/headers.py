@@ -391,18 +391,36 @@ class Headers:
 	def load_raw_frame(cls, raw_frame, flags=None):
 		
 		if flags:
+			if is_flagged(flags, 0):
+				is_end_stream = True
+			else:
+				is_end_stream = False
+
+			#END_HEADERS
+			if is_flagged(flags, 2):
+				is_end_headers = True
+			else:
+				is_end_headers = False
+
 			#padded
-			if is_flagged(flags, 4):
+			if is_flagged(flags, 3):
 				padding_length = raw_frame[0]
 				raw_frame = raw_frame[1:-padding_length]
+			else:
+				padding_length = 0
 
 			#priority
-			if is_flagged(flags, 6):
+			if is_flagged(flags, 5):
 				print("Frame with priority is not supported now")
 				raise Exception
 		
 		fields = Field.load_raw_frame(raw_frame)
-		return Headers(fields)
+		return Headers(
+			fields=fields,
+			padding_length=padding_length,
+			is_end_headers=is_end_headers,
+			is_end_stream=is_end_stream
+			)
 
 
 	def __repr__(self):
