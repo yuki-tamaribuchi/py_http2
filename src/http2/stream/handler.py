@@ -1,3 +1,6 @@
+from threading import Thread
+
+
 from ..frame import Frame
 from ..stream.stream import Stream
 from ..utils.flags import is_flagged
@@ -40,29 +43,37 @@ class StreamHandler:
 
 	def add_preface_frame(self, frames):
 		for frame in frames:
-			self.__handle(frame)
+			self.__handle_request_frame(frame)
 		
 
 	def run(self):
+		handle_request_thread = Thread(target=self.__handle_request)
+		handle_response_thread = Thread(target=self.__handle_response)
+
+		handle_request_thread.start()
+		handle_response_thread.start()
+		
+
+	def __handle_request(self):
 		while True:
 			raw_frame = recv_request(self.client_sock)
 			if raw_frame == b"":
 				break
 			frames = Frame.load_raw_frame(raw_frame)
 			for frame in frames:
-				if not self.__handle(frame):
+				if not self.__handle_request_frame(frame):
 					print("Handle error")
 					raise Exception
 
 
-	def __handle(self, frame):
+	def __handle_request_frame(self, frame):
 		# DATA frame
 		if frame.frame_type == 0:
 			pass
 
 		# HEADERS frame
 		elif frame.frame_type == 1:
-			if is_flagged(frame.flags, 1):
+			if is_flagged(frame.flags, 0):
 				state = self.STREAM_STATES["half_closed_remote"]
 			else:
 				state = self.STREAM_STATES["open"]
@@ -106,6 +117,16 @@ class StreamHandler:
 			self.window_size = frame.payload
 
 		return True
+
+
+	def __handle_response(self):
+		while True:
+			pass
+
+	
+	def __handle_response_frame(self):
+		pass
+
 
 	def __get_request_stream_by_id(self, id):
 		for stream in self.request_stream_list:
