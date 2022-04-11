@@ -1,6 +1,8 @@
 from threading import Thread
 
 
+from ..request import Request
+
 from ..frame import Frame
 from ..stream.stream import Stream
 from ..utils.flags import is_flagged
@@ -30,8 +32,8 @@ class StreamHandler:
 	def __init__(self, client_sock, request_queue):
 		self.client_sock = client_sock
 		self.request_queue = request_queue
-		self.request_stream_list = []
-		self.response_stream_list = []
+		self.client_stream_list = []
+		self.server_stream_list = []
 		self.max_current_streams = None
 		self.current_max_stream_identification = None
 		self.window_size = None
@@ -57,19 +59,24 @@ class StreamHandler:
 	def __handle_request(self):
 		while True:
 			raw_frame = recv_request(self.client_sock)
-			if raw_frame == b"":
-				break
-			frames = Frame.load_raw_frame(raw_frame)
-			for frame in frames:
-				if not self.__handle_request_frame(frame):
-					print("Handle error")
-					raise Exception
+			if not raw_frame == b"":
+				frames = Frame.load_raw_frame(raw_frame)
+				for frame in frames:
+					if not self.__handle_request_frame(frame):
+						print("Handle error")
+						raise Exception
 
 
 	def __handle_request_frame(self, frame):
 		# DATA frame
 		if frame.frame_type == 0:
-			pass
+			stream_idx = self.__get_client_stream_index_by_id(frame.stream_identifier)
+			self.client_stream_list[stream_idx].data = frame.payload.data
+
+			if frame.payload.is_end_stream:
+				stream = self.client_stream_list[stream_idx]
+				request = self.__create_request_instance(stream)
+				self.request_queue.put((request, stream.stream_identifier))
 
 		# HEADERS frame
 		elif frame.frame_type == 1:
@@ -81,18 +88,11 @@ class StreamHandler:
 
 			stream.add_request_headers_to_table(frame.payload)
 
+			if frame.payload.is_end_stream:
+				request = stream.client_headers_table.create_request_instance()
+				self.request_queue.put((request, stream.stream_identifier))
 
-
-
-
-			request = stream.request_headers_table.create_request_instance()
-			self.request_queue.put((request, stream.stream_identifier))
-
-
-
-
-
-			self.__add_request_stream_to_list(stream)
+			self.__add_client_stream_to_list(stream)
 
 		# SETTINGS frame
 		elif frame.frame_type == 4:
@@ -128,18 +128,18 @@ class StreamHandler:
 		pass
 
 
-	def __get_request_stream_by_id(self, id):
-		for stream in self.request_stream_list:
+	def __get_client_stream_index_by_id(self, id):
+		for i, stream in enumerate(self.client_stream_list):
 			if stream.stream_identifier == id:
-				return stream
+				return i
 		return None
 
-	def __add_request_stream_to_list(self, stream):
-		self.request_stream_list.append(stream)
+	def __add_client_stream_to_list(self, stream):
+		self.client_stream_list.append(stream)
 
 	
-	def __add_response_stream_to_list(self, stream):
-		self.response_stream_list.append(stream)
+	def __add_server_stream_to_list(self, stream):
+		self.server_stream_list.append(stream)
 
 	
 	def __recieve_frame(self, frame):
@@ -148,3 +148,37 @@ class StreamHandler:
 	
 	def __send_frame(self):
 		pass
+
+	
+	def __create_request_instance(self, stream):
+		headers_dict = stream.request_headers_table.create_headers_dict()
+
+		if ":authority" in headers_dict:
+			authority = headers_dict.pop(":authority")
+		
+		if ":scheme" in headers_dict:
+			scheme = headers_dict.pop(":scheme")
+		
+		if ":method" in headers_dict:
+			method = headers_dict.pop(":method")
+
+		if ":path" in headers_dict:
+			uri = headers_dict.pop(":path")
+
+		options = headers_dict
+
+		if stream.data:
+			body = stream.data
+		else:
+			body = None
+
+
+		return Request(
+			version="HTTP/2.0",
+			authority=authority,
+			scheme=scheme,
+			method=method,
+			uri=uri,
+			options=options,
+			body=body
+		)
