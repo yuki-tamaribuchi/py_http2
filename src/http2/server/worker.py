@@ -45,14 +45,12 @@ class Worker(Thread):
 		self.app = app
 		self.request_queue = Queue()
 		self.response_queue = Queue()
+		self.work_thread = Thread(target=self.__work)
+		self.call_app_thread = Thread(target=self.__call_app)
 
 	def start(self):
-		
-		work_thread = Thread(target=self.__work)
-		call_app_thread = Thread(target=self.__call_app)
-		
-		work_thread.start()
-		call_app_thread.start()
+		self.work_thread.start()
+		self.call_app_thread.start()
 
 		return
 
@@ -90,7 +88,7 @@ class Worker(Thread):
 			if preface_frame:
 				handler.add_preface_frame(preface_frame)
 			handler.run()
-			return
+			return True
 
 
 	def __call_app(self):
