@@ -73,32 +73,63 @@ class Table:
 		self.dynamic_fileds = {}
 		self.fields_without_indexing = {}
 
-	def set_max_table_size(self, field):
-		self.max_table_size = field.max_size
+	def set_max_table_size(self, max_size):
+		self.max_table_size = max_size
 
-	def add_static_field(self, field):
-		self.used_static_field_indexes.append(field.index)
+	def add_static_field(self, index):
+		self.used_static_field_indexes.append(index)
 
-	def add_fields_without_indexing(self, field):
-		if field.field_type == 3:
-			self.fields_without_indexing[self.STATIC_HEADER_FIELDS[str(field.index)]["name"]] = field.value
-		else:
-			self.fields_without_indexing[field.name] = field.value
+	def add_fields_without_indexing(self, value, index=None, name=None):
+		if index:
+			self.fields_without_indexing[self.STATIC_HEADER_FIELDS[str(index)]["name"]] = value
+		elif name:
+			self.fields_without_indexing[name] = value
 
-	def add_dynamic_field(self, field):
+	def add_dynamic_field(self, value, index=None, name=None):
 		new_dynamic_fields = {}
-		if field.field_type == 1:
-			new_dynamic_fields["62"] = {"name": self.STATIC_HEADER_FIELDS[str(field.index)]["name"], "value": field.value}
-		else:
-			new_dynamic_fields["62"] = {"name": field.name, "value": field.value}
+		if index:
+			new_dynamic_fields["62"] = {"name": self.STATIC_HEADER_FIELDS[str(index)]["name"], "value": value}
+		elif name:
+			new_dynamic_fields["62"] = {"name": name, "value": value}
 
 		if len(self.dynamic_fileds)>0:
 			for k, v in self.dynamic_fileds.items():
 				new_dynamic_fields[str(int(k)+1)] = v
 		self.dynamic_fileds = new_dynamic_fields
+	
+
+	def load_response(self, status, options):
+		is_status_found = False
+		for i in range(8, 15):
+			if self.STATIC_HEADER_FIELDS[str(i)]["value"] == str(status):
+				self.add_static_field(str(i))
+				is_status_found = True
+				break
+		
+		if not is_status_found:
+			self.add_dynamic_field(str(status), index=8)
+
+		
+		if options:
+			STATIC_HEADER_FIELDS_NAME_INDEXED = {v["name"]: {"index":k, "value":v["value"]} for k, v in self.STATIC_HEADER_FIELDS.items()}
+			for option_k, option_v in options.items():
+				#オプション名のlowerが辞書内にある場合
+				if option_k.lower() in STATIC_HEADER_FIELDS_NAME_INDEXED:
+					#辞書内のvalueとoptionのvalueが同じ場合
+					if option_v == STATIC_HEADER_FIELDS_NAME_INDEXED[option_k.lower()]["value"]:
+						self.add_static_field(STATIC_HEADER_FIELDS_NAME_INDEXED[option_k.lower()]["index"])
+					#辞書内のvalueとoptionのvalueが違う場合
+					else:
+						self.add_dynamic_field(option_v, index=STATIC_HEADER_FIELDS_NAME_INDEXED[option_k.lower()]["index"])
+
+				#オプション名のlowerが辞書内にない場合
+				else:
+					self.add_dynamic_field(option_v, name=option_k.lower())
+			
+		return True
 
 
-	def __create_headers_dict(self):
+	def create_headers_dict(self):
 		headers_dict = {}
 
 		if self.used_static_field_indexes:
