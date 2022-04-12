@@ -29,9 +29,10 @@ class StreamHandler:
 		"closed": 5
 	}
 	
-	def __init__(self, client_sock, request_queue):
+	def __init__(self, client_sock, request_queue, response_queue):
 		self.client_sock = client_sock
 		self.request_queue = request_queue
+		self.response_queue = response_queue
 		self.client_stream_list = []
 		self.server_stream_list = []
 		self.max_current_streams = None
@@ -121,11 +122,18 @@ class StreamHandler:
 
 	def __handle_response(self):
 		while True:
-			pass
+			if not self.response_queue.empty():
+				response, stream_identifier = self.response_queue.get()
+				self.__handle_response_frame(response, stream_identifier)
 
 	
-	def __handle_response_frame(self):
-		pass
+	def __handle_response_frame(self, response, stream_identifier):
+		response_status = response.status
+		response_options = response.options
+		response_body = response.body
+
+		stream_idx = self.__get_client_stream_index_by_id(stream_identifier)
+		self.client_stream_list[stream_idx].response_headers_table.load_response(response_status, response_options)
 
 
 	def __get_client_stream_index_by_id(self, id):
