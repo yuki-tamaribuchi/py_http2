@@ -15,13 +15,17 @@ class Stream:
 	def add_request_headers_to_table(self, headers):
 		for field in headers.fields:
 			if field.field_type == 0:
-				self.request_headers_table.add_static_field(field)
-			elif field.field_type in [1, 2]:
-				self.request_headers_table.add_dynamic_field(field)
-			elif field.field_type in [3, 4]:
-				self.request_headers_table.add_fields_without_indexing(field)
+				self.request_headers_table.add_static_field(field.index)
+			elif field.field_type == 1:
+				self.request_headers_table.add_dynamic_field(field.value, index=field.index)
+			elif field.field_type == 2:
+				self.request_headers_table.add_dynamic_field(field.value, name=field.name)
+			elif field.field_type == 3:
+				self.request_headers_table.add_fields_without_indexing(field.value, index=field.index)
+			elif field.field_type == 4:
+				self.request_headers_table.add_fields_without_indexing(field.value, name=field.name)
 			elif field.field_type in [5, 6]:
 				print("Literal Header Field Never Indexed is not implemented")
 				raise Exception
 			elif field.field_type == 7:
-				self.request_headers_table.set_max_table_size(field)
+				self.request_headers_table.set_max_table_size(field.max_size)
