@@ -118,31 +118,3 @@ class Table:
 				headers_dict[k] = v
 		
 		return headers_dict
-
-	def create_request_instance(self):
-
-		headers_dict = self.__create_headers_dict()
-		
-		if ":authority" in headers_dict:
-			authority = headers_dict.pop(":authority")
-		
-		if ":scheme" in headers_dict:
-			scheme = headers_dict.pop(":scheme")
-		
-		if ":method" in headers_dict:
-			method = headers_dict.pop(":method")
-
-		if ":path" in headers_dict:
-			uri = headers_dict.pop(":path")
-
-		options = headers_dict
-
-
-		return Request(
-			version="HTTP/2.0",
-			authority=authority,
-			scheme=scheme,
-			method=method,
-			uri=uri,
-			options=options,
-		)
