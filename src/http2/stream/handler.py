@@ -134,6 +134,9 @@ class StreamHandler:
 
 		stream_idx = self.__get_client_stream_index_by_id(stream_identifier)
 		self.client_stream_list[stream_idx].response_headers_table.load_response(response_status, response_options)
+		headers = self.client_stream_list[stream_idx].response_headers_table.create_headers()
+		frame = Frame.create_frame(headers, stream_identifier)
+		raw_frame = frame.get_raw_frame()
 
 
 	def __get_client_stream_index_by_id(self, id):
