@@ -1,4 +1,5 @@
 from ..request import Request
+from ..frame.headers import Headers
 
 
 class Table:
@@ -88,7 +89,7 @@ class Table:
 	def add_dynamic_field(self, value, index=None, name=None):
 		new_dynamic_fields = {}
 		if index:
-			new_dynamic_fields["62"] = {"name": self.STATIC_HEADER_FIELDS[str(index)]["name"], "value": value}
+			new_dynamic_fields["62"] = {"name": self.STATIC_HEADER_FIELDS[str(index)]["name"], "original_index":str(index), "value": value}
 		elif name:
 			new_dynamic_fields["62"] = {"name": name, "value": value}
 
@@ -149,3 +150,7 @@ class Table:
 				headers_dict[k] = v
 		
 		return headers_dict
+
+	
+	def create_headers(self):
+		return Headers.load_table(self.used_static_field_indexes, self.dynamic_fileds)
