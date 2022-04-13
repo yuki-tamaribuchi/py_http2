@@ -334,9 +334,62 @@ class Field:
 		if self.field_type == 0:
 			field_byte_str = "0" + bin_padding(bin(self.index).replace("0b", ""), 7)
 			return bytes(int(field_byte_str, 2))
+		elif self.field_type == 1:
+			first_bit_str = "01" + bin_padding(bin(self.index).replace("0b", ""), 6)
+			first_bytes = int(first_bit_str, 2).to_bytes(1, "big")
+
+			if self.value_h:
+				value_h = "1"
+			else:
+				value_h = "0"
+			
+			value = bytes(self.value, "ascii")
+
+			length = len(value)
+			if length >= 2**7 - 1:
+				print("Multi bytes length is now supported now")
+				raise Exception
+			length_bit_str = bin_padding(bin(length).replace("0b", ""), 7)
+			value_length_bit_str = value_h + length_bit_str
+			value_length_bytes = int(value_length_bit_str, 2).to_bytes(1, "big")
+			
+			return first_bytes + value_length_bytes + value
+
+		elif self.field_type == 2:
+			first_bit_str = "01000000"
+			first_bytes = int(first_bit_str, 2).to_bytes(1, "big")
+
+			if self.name_h:
+				name_h = "1"
+			else:
+				name_h = "0"
+
+			name = bytes(self.name, "ascii")
+			name_length = len(name)
+			if name_length >= 2**7 - 1:
+				print("Multi bytes length is now supported now")
+				raise Exception
+			name_length_bit_str = name_h + bin_padding(bin(name_length).replace("0b", ""), 7)
+			name_length_bytes = int(name_length_bit_str, 2).to_bytes(1, "big")
+
+			if self.value_h:
+				value_h = "1"
+			else:
+				value_h = "0"
+
+			value = bytes(self.value, "ascii")
+			value_length = len(value)
+			if value_length >= 2**7 - 1:
+				print("Multi bytes length is now supported now")
+				raise Exception
+			value_length_bit_str = value_h + bin_padding(bin(value_length).replace("0b", ""), 7)
+			value_length_bytes = int(value_length_bit_str).to_bytes(1, "big")
+			
+			return first_bytes + name_length_bytes + name + value_length_bytes + value
+
 		else:
 			print("Type %s is not supported now"%(self.field_type_str))
-			raise Exception
+			return b""
 		
 
 	def __str__(self):
@@ -377,7 +430,7 @@ class Field:
 
 
 class Headers:
-	def __init__(self, fields, stream_dependency=None, weight=None, priority=None, padding_length=0, is_end_stream=False, is_end_headers=False):
+	def __init__(self, fields, stream_dependency=None, weight=None, priority=None, padding_length=0, is_end_stream=False, is_end_headers=True):
 		self.fields = fields
 		self.stream_dependency = stream_dependency
 		self.weight = weight
@@ -421,6 +474,30 @@ class Headers:
 			is_end_headers=is_end_headers,
 			is_end_stream=is_end_stream
 			)
+
+
+	@classmethod
+	def load_table(cls, static_fields, dynamic_fileds):
+		fields = []
+
+		for field_index in static_fields:
+			fields.append(Field(0, index=int(field_index)))
+		
+		for field_dict in dynamic_fileds.values():
+			if "original_index" in field_dict:
+				fields.append(Field(1, index=int(field_dict["original_index"]), value=field_dict["value"], value_h=False))
+			else:
+				fields.append(Field(2, name=field_dict["name"], name_h=False, value=field_dict["value"], value_h=False))
+
+		return Headers(fields)
+
+
+	def get_raw_frame(self):
+		raw_frame = b""
+
+		for field in self.fields:
+			raw_frame += field.get_raw_frame()
+		return raw_frame
 
 
 	def __repr__(self):
