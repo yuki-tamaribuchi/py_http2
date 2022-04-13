@@ -1,9 +1,11 @@
 import struct
 
+from .data import Data
 from .settings import Settings
 from .headers import Headers
 
 from ..utils.bin import is_bin, bin_padding
+from ..utils.flags import set_flag
 
 
 class Frame:
@@ -23,12 +25,7 @@ class Frame:
 		}
 
 
-	def __init__(self, frame_type, flags, stream_identifier, payload, length=None):
-		if length and not length == len(payload):
-			print("Frame length error")
-			raise Exception
-
-		self.length = len(payload)
+	def __init__(self, frame_type, flags, stream_identifier, payload):
 		self.frame_type = frame_type
 		self.frame_type_str = self.FRAME_TYPES[str(self.frame_type)]
 		if type(flags) == int:
@@ -36,32 +33,41 @@ class Frame:
 		elif type(flags) == str and is_bin(flags):
 			self.flags = flags
 		self.stream_identifier = stream_identifier
-
-		if self.frame_type == 1:
-			self.payload = self.__load_headers_frame(payload)
-		elif self.frame_type == 4:
-			self.payload = self.__load_settings_frame(payload)
-		elif self.frame_type == 8:
-			payload = int.from_bytes(payload, byteorder="big")
-			self.payload = payload
-		else:
-			self.payload = payload
+		self.payload = payload
 
 
 	@classmethod
 	def load_raw_frame(cls, raw_frame):
+		def load_payload(frame_type, payload):
+			if frame_type == 0:
+				payload = cls.__load__data_frame(cls, payload, flags)
+			elif frame_type == 1:
+				payload = cls.__load_headers_frame(cls, payload, flags)
+			elif frame_type == 4:
+				payload = cls.__load_settings_frame(cls, payload)
+			elif frame_type == 8:
+				payload = int.from_bytes(payload, byteorder="big")
+				payload = b""
+
+			return payload
+
 		length = int.from_bytes(raw_frame[0:3], byteorder="big")
 		frame_type = raw_frame[3]
 		flags = raw_frame[4]
+		flags = bin_padding(bin(flags).replace("0b", ""))
 		stream_identifier = int.from_bytes(raw_frame[5:9], byteorder="big")
 		payload = raw_frame[9:]
+
 		
 		if len(payload) == length:
-			frame = Frame(frame_type, flags, stream_identifier, payload, length)
+			payload = load_payload(frame_type, payload)
+			frame = Frame(frame_type, flags, stream_identifier, payload)
 			return [frame]
 		else:
 			payload, next_raw_frame = payload[:length], payload[length:]
-			frame = Frame(frame_type, flags, stream_identifier, payload, len(payload))
+			payload = load_payload(frame_type, payload)
+
+			frame = Frame(frame_type, flags, stream_identifier, payload)
 			next_frame = Frame.load_raw_frame(next_raw_frame)
 			frames = [frame]
 			if next_frame:
@@ -70,14 +76,15 @@ class Frame:
 
 	def get_raw_frame(self):
 		raw_frame = struct.pack(
-			"!BH2Bi",
-			*divmod(self.length, 1<<16),
+			"!2Bi",
 			self.frame_type,
 			int(self.flags, 2),
 			self.stream_identifier
 		)
 
-		if self.frame_type == 4:
+		if self.frame_type == 1:
+			raw_frame = self.payload.get_raw_frame()
+		elif self.frame_type == 4:
 			raw_frame += b"".join(frame.get_raw_frame() for frame in self.payload)
 		else:
 			if type(self.payload) == bytes:
@@ -85,7 +92,13 @@ class Frame:
 			else:
 				raw_frame += bytes(self.payload, "utf-8")
 
-		return raw_frame
+		length = len(raw_frame)
+		length_bytes = struct.pack(
+			"!BH",
+			*divmod(length, 1<<16)
+		)
+
+		return length_bytes + raw_frame
 
 
 	def __str__(self):
@@ -98,6 +111,11 @@ class Frame:
 			self.payload
 			)
 
+	
+	def __load__data_frame(self, payload, flags):
+		data = Data.load_raw_frame(payload, flags)
+		return data
+
 
 	def __load_settings_frame(self, payload):
 		frame_list = []
@@ -108,6 +126,22 @@ class Frame:
 		return frame_list
 
 
-	def __load_headers_frame(self, payload):
-		headers = Headers.load_raw_frame(payload, self.flags)
+	def __load_headers_frame(self, payload, flags):
+		headers = Headers.load_raw_frame(payload, flags)
 		return headers
+
+
+	@classmethod
+	def create_frame(cls, payload, stream_identifier):
+		flags = "00000000"
+
+		if isinstance(payload, Headers):
+			frame_type = 1
+
+			if payload.is_end_stream:
+				flags = set_flag(flags, 0)
+			
+			if payload.is_end_headers:
+				flags = set_flag(flags, 2)
+
+		return Frame(frame_type, flags, stream_identifier, payload)
