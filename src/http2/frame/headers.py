@@ -343,7 +343,7 @@ class Field:
 			else:
 				value_h = "0"
 			
-			value = bytes(self.value, "ascii")
+			value = bytes(reversed(bytes(self.value, "ascii")))
 
 			length = len(value)
 			if length >= 2**7 - 1:
@@ -364,7 +364,7 @@ class Field:
 			else:
 				name_h = "0"
 
-			name = bytes(self.name, "ascii")
+			name = bytes(reversed(bytes(self.name, "ascii")))
 			name_length = len(name)
 			if name_length >= 2**7 - 1:
 				print("Multi bytes length is now supported now")
@@ -377,7 +377,7 @@ class Field:
 			else:
 				value_h = "0"
 
-			value = bytes(self.value, "ascii")
+			value = bytes(reversed(bytes(self.value, "ascii")))
 			value_length = len(value)
 			if value_length >= 2**7 - 1:
 				print("Multi bytes length is now supported now")
