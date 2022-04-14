@@ -75,37 +75,33 @@ class Frame:
 			return frames
 
 	def get_raw_frame(self):
+		if self.frame_type == 1:
+			raw_payload = self.payload.get_raw_frame()
+		elif self.frame_type == 4:
+			raw_payload = b"".join(frame.get_raw_frame for frame in self.payload)
+		else:
+			if type(self.payload) == bytes:
+				raw_payload = self.payload
+			else:
+				raw_payload = bytes(self.payload, "utf-8")
+
+
 		raw_frame = struct.pack(
-			"!2Bi",
+			"!BH2Bi",
+			*divmod(len(raw_payload), 1<<16),
 			self.frame_type,
 			int(self.flags, 2),
 			self.stream_identifier
 		)
 
-		if self.frame_type == 1:
-			raw_frame = self.payload.get_raw_frame()
-		elif self.frame_type == 4:
-			raw_frame += b"".join(frame.get_raw_frame() for frame in self.payload)
-		else:
-			if type(self.payload) == bytes:
-				raw_frame += self.payload
-			else:
-				raw_frame += bytes(self.payload, "utf-8")
-
-		length = len(raw_frame)
-		length_bytes = struct.pack(
-			"!BH",
-			*divmod(length, 1<<16)
-		)
-
-		return length_bytes + raw_frame
+		return raw_frame + raw_payload
 
 
 	def __str__(self):
 		return "----------\r\nframe_type: %s(%d)\r\nlength: %d\r\nflags: 0b%s\r\nstream_identifier: %d\r\npayload: %s"%(
 			self.frame_type_str,
 			self.frame_type,
-			self.length,
+			len(self.payload),
 			self.flags,
 			self.stream_identifier,
 			self.payload
