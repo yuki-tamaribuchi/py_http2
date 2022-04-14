@@ -332,7 +332,7 @@ class Field:
 
 	def get_raw_frame(self):
 		if self.field_type == 0:
-			field_byte_str = "0" + bin_padding(bin(self.index).replace("0b", ""), 7)
+			field_byte_str = "1" + bin_padding(bin(self.index).replace("0b", ""), 7)
 			return bytes(int(field_byte_str, 2))
 		elif self.field_type == 1:
 			first_bit_str = "01" + bin_padding(bin(self.index).replace("0b", ""), 6)
