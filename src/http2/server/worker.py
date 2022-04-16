@@ -84,7 +84,7 @@ class Worker(Thread):
 				raise Exception
 
 
-			handler = StreamHandler(self.client_sock, self.request_queue)
+			handler = StreamHandler(self.client_sock, self.request_queue, self.response_queue)
 			if preface_frame:
 				handler.add_preface_frame(preface_frame)
 			handler.run()
@@ -95,4 +95,5 @@ class Worker(Thread):
 		while True:
 			if not self.request_queue.empty():
 				request, stream_identifier = self.request_queue.get()
-				self.app(request)
+				response = self.app(request)
+				self.response_queue.put((response,stream_identifier))
