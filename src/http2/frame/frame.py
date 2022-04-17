@@ -3,6 +3,7 @@ import struct
 from .data import Data
 from .settings import Settings
 from .headers import Headers
+from .goaway import Goaway
 
 from ..utils.bin import is_bin, bin_padding
 from ..utils.flags import set_flag
@@ -28,10 +29,7 @@ class Frame:
 	def __init__(self, frame_type, flags, stream_identifier, payload):
 		self.frame_type = frame_type
 		self.frame_type_str = self.FRAME_TYPES[str(self.frame_type)]
-		if type(flags) == int:
-			self.flags = bin_padding(bin(flags).replace("0b", ""))
-		elif type(flags) == str and is_bin(flags):
-			self.flags = flags
+		self.flags = flags
 		self.stream_identifier = stream_identifier
 		self.payload = payload
 
@@ -45,16 +43,16 @@ class Frame:
 				payload = cls.__load_headers_frame(cls, payload, flags)
 			elif frame_type == 4:
 				payload = cls.__load_settings_frame(cls, payload)
+			elif frame_type == 7:
+				payload = cls.__load_goaway_frame(cls, payload)
 			elif frame_type == 8:
 				payload = int.from_bytes(payload, byteorder="big")
-				payload = b""
 
 			return payload
 
 		length = int.from_bytes(raw_frame[0:3], byteorder="big")
 		frame_type = raw_frame[3]
 		flags = raw_frame[4]
-		flags = bin_padding(bin(flags).replace("0b", ""))
 		stream_identifier = int.from_bytes(raw_frame[5:9], byteorder="big")
 		payload = raw_frame[9:]
 
@@ -90,7 +88,7 @@ class Frame:
 			"!BH2Bi",
 			*divmod(len(raw_payload), 1<<16),
 			self.frame_type,
-			int(self.flags, 2),
+			self.flags,
 			self.stream_identifier
 		)
 
@@ -98,7 +96,7 @@ class Frame:
 
 
 	def __str__(self):
-		return "----------\r\nframe_type: %s(%d)\r\nlength: %d\r\nflags: 0b%s\r\nstream_identifier: %d\r\npayload: %s"%(
+		return "----------\r\nframe_type: %s(%d)\r\nlength: %d\r\nflags: %s\r\nstream_identifier: %d\r\npayload: %s"%(
 			self.frame_type_str,
 			self.frame_type,
 			len(self.payload),
@@ -126,18 +124,22 @@ class Frame:
 		headers = Headers.load_raw_frame(payload, flags)
 		return headers
 
+	def __load_goaway_frame(self, payload):
+		goaway = Goaway.load_raw_frame(payload)
+		return goaway
+
 
 	@classmethod
 	def create_frame(cls, payload, stream_identifier):
-		flags = "00000000"
+		flags = 0
 
 		if isinstance(payload, Headers):
 			frame_type = 1
 
 			if payload.is_end_stream:
-				flags = set_flag(flags, 0)
+				flags = set_flag(flags, 0b1)
 			
 			if payload.is_end_headers:
-				flags = set_flag(flags, 2)
+				flags = set_flag(flags, 0b100)
 
 		return Frame(frame_type, flags, stream_identifier, payload)
