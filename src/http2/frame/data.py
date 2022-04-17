@@ -10,12 +10,12 @@ class Data:
 	
 	@classmethod
 	def load_raw_frame(self, raw_frame, flags):
-		if is_flagged(flags, 0):
+		if is_flagged(flags, 0b1):
 			is_end_stream = True
 		else:
 			is_end_stream = False
 
-		if is_flagged(flags, 3):
+		if is_flagged(flags, 0b1000):
 			padding_length = raw_frame[0]
 			raw_frame = raw_frame[1:padding_length]
 		else:
