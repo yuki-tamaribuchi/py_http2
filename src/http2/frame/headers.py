@@ -332,8 +332,10 @@ class Field:
 
 	def get_raw_frame(self):
 		if self.field_type == 0:
+			if self.index >= 2**7 - 1:
+				print("Multi bytes length is not supported now")
 			field_byte_str = "1" + bin_padding(bin(self.index).replace("0b", ""), 7)
-			return bytes(int(field_byte_str, 2))
+			return int(field_byte_str, 2).to_bytes(1, "big")
 		elif self.field_type == 1:
 			first_bit_str = "01" + bin_padding(bin(self.index).replace("0b", ""), 6)
 			first_bytes = int(first_bit_str, 2).to_bytes(1, "big")
@@ -343,11 +345,11 @@ class Field:
 			else:
 				value_h = "0"
 			
-			value = bytes(reversed(bytes(self.value, "ascii")))
+			value = bytes(self.value, "ascii")
 
 			length = len(value)
 			if length >= 2**7 - 1:
-				print("Multi bytes length is now supported now")
+				print("Multi bytes length is not supported now")
 				raise Exception
 			length_bit_str = bin_padding(bin(length).replace("0b", ""), 7)
 			value_length_bit_str = value_h + length_bit_str
@@ -364,10 +366,10 @@ class Field:
 			else:
 				name_h = "0"
 
-			name = bytes(reversed(bytes(self.name, "ascii")))
+			name = bytes(self.name, "ascii")
 			name_length = len(name)
 			if name_length >= 2**7 - 1:
-				print("Multi bytes length is now supported now")
+				print("Multi bytes length is not supported now")
 				raise Exception
 			name_length_bit_str = name_h + bin_padding(bin(name_length).replace("0b", ""), 7)
 			name_length_bytes = int(name_length_bit_str, 2).to_bytes(1, "big")
@@ -377,13 +379,13 @@ class Field:
 			else:
 				value_h = "0"
 
-			value = bytes(reversed(bytes(self.value, "ascii")))
+			value = bytes(self.value, "ascii")
 			value_length = len(value)
 			if value_length >= 2**7 - 1:
-				print("Multi bytes length is now supported now")
+				print("Multi bytes length is not supported now")
 				raise Exception
 			value_length_bit_str = value_h + bin_padding(bin(value_length).replace("0b", ""), 7)
-			value_length_bytes = int(value_length_bit_str).to_bytes(1, "big")
+			value_length_bytes = int(value_length_bit_str, 2).to_bytes(1, "big")
 			
 			return first_bytes + name_length_bytes + name + value_length_bytes + value
 
@@ -444,26 +446,26 @@ class Headers:
 	def load_raw_frame(cls, raw_frame, flags=None):
 		
 		if flags:
-			if is_flagged(flags, 0):
+			if is_flagged(flags, 0b1):
 				is_end_stream = True
 			else:
 				is_end_stream = False
 
 			#END_HEADERS
-			if is_flagged(flags, 2):
+			if is_flagged(flags, 0b100):
 				is_end_headers = True
 			else:
 				is_end_headers = False
 
 			#padded
-			if is_flagged(flags, 3):
+			if is_flagged(flags, 0b1000):
 				padding_length = raw_frame[0]
 				raw_frame = raw_frame[1:-padding_length]
 			else:
 				padding_length = 0
 
 			#priority
-			if is_flagged(flags, 5):
+			if is_flagged(flags, 0b10000):
 				print("Frame with priority is not supported now")
 				raise Exception
 		
