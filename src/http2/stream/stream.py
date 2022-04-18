@@ -1,4 +1,5 @@
 from ..table.table import Table
+from ..frame.data import Data
 
 class Stream:
 	def __init__(self, state:int, stream_identifier:int, priority:int=None, stream_dependency:int=None, weight:int=16):
@@ -30,3 +31,11 @@ class Stream:
 				raise Exception
 			elif field.field_type == 7:
 				self.request_headers_table.set_max_table_size(field.max_size)
+
+	
+	def create_response_data_frame(self, padding_length, is_end_stream):
+		return Data(
+			data=self.response_data,
+			padding_length=padding_length,
+			is_end_stream=is_end_stream
+		)
