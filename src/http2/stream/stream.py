@@ -9,7 +9,8 @@ class Stream:
 		self.weight = weight
 		self.request_headers_table = Table()
 		self.response_headers_table = Table()
-		self.data = None
+		self.request_data = None
+		self.response_data = None
 
 	
 	def add_request_headers_to_table(self, headers):
