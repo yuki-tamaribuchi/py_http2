@@ -55,7 +55,7 @@ class StreamHandler:
 
 		handle_request_thread.start()
 		handle_response_thread.start()
-		
+
 
 	def __handle_request(self):
 		while True:
@@ -72,7 +72,7 @@ class StreamHandler:
 		# DATA frame
 		if frame.frame_type == 0:
 			stream_idx = self.__get_client_stream_index_by_id(frame.stream_identifier)
-			self.client_stream_list[stream_idx].data = frame.payload.data
+			self.client_stream_list[stream_idx].request_data = frame.payload.data
 
 			if frame.payload.is_end_stream:
 				stream = self.client_stream_list[stream_idx]
@@ -178,8 +178,8 @@ class StreamHandler:
 
 		options = headers_dict
 
-		if stream.data:
-			body = stream.data
+		if stream.request_data:
+			body = stream.request_data
 		else:
 			body = None
 
