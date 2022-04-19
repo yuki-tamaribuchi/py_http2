@@ -73,7 +73,9 @@ class Frame:
 			return frames
 
 	def get_raw_frame(self):
-		if self.frame_type == 1:
+		if self.frame_type == 0:
+			raw_payload = self.payload.get_raw_frame()
+		elif self.frame_type == 1:
 			raw_payload = self.payload.get_raw_frame()
 		elif self.frame_type == 4:
 			raw_payload = b"".join(frame.get_raw_frame for frame in self.payload)
@@ -96,10 +98,9 @@ class Frame:
 
 
 	def __str__(self):
-		return "----------\r\nframe_type: %s(%d)\r\nlength: %d\r\nflags: %s\r\nstream_identifier: %d\r\npayload: %s"%(
+		return "----------\r\nframe_type: %s(%d)\r\nflags: %s\r\nstream_identifier: %d\r\npayload: %s"%(
 			self.frame_type_str,
 			self.frame_type,
-			len(self.payload),
 			self.flags,
 			self.stream_identifier,
 			self.payload
@@ -112,11 +113,7 @@ class Frame:
 
 
 	def __load_settings_frame(self, payload):
-		frame_list = []
-
-		for i in range(0, len(payload), 6):
-			frame_list.append(Settings(payload[i:i+6]))
-
+		frame_list = Settings.load_raw_frame(payload)
 		return frame_list
 
 
@@ -140,6 +137,15 @@ class Frame:
 				flags = set_flag(flags, 0b1)
 			
 			if payload.is_end_headers:
+				flags = set_flag(flags, 0b100)
+
+		elif isinstance(payload, Data):
+			frame_type = 0
+			
+			if payload.is_end_stream:
+				flags = set_flag(flags, 0b1)
+			
+			if payload.padding_length:
 				flags = set_flag(flags, 0b100)
 
 		return Frame(frame_type, flags, stream_identifier, payload)
