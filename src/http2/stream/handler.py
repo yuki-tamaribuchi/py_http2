@@ -124,19 +124,44 @@ class StreamHandler:
 		while True:
 			if not self.response_queue.empty():
 				response, stream_identifier = self.response_queue.get()
-				self.__handle_response_frame(response, stream_identifier)
+				if not self.__handle_response_frame(response, stream_identifier):
+					print("Response handler error")
+					raise Exception
 
 	
 	def __handle_response_frame(self, response, stream_identifier):
+		frames = []
 		response_status = response.status
 		response_options = response.options
 		response_body = response.body
 
+
 		stream_idx = self.__get_client_stream_index_by_id(stream_identifier)
+
+		is_end_headers = True
+
+		if response_body:
+			is_end_stream = False
+			self.client_stream_list[stream_idx].response_data = response_body
+		else:
+			is_end_stream = True
+
 		self.client_stream_list[stream_idx].response_headers_table.load_response(response_status, response_options)
-		headers = self.client_stream_list[stream_idx].response_headers_table.create_headers()
-		frame = Frame.create_frame(headers, stream_identifier)
-		raw_frame = frame.get_raw_frame()
+		headers = self.client_stream_list[stream_idx].response_headers_table.create_headers(is_end_headers=is_end_headers, is_end_stream=is_end_stream)
+		headers_frame = Frame.create_frame(headers, stream_identifier)
+		frames.append(headers_frame)
+
+		if response_body:
+			data = self.client_stream_list[stream_idx].create_response_data_frame(padding_length=None, is_end_stream=True)
+			data_frame = Frame.create_frame(data, stream_identifier)
+			frames.append(data_frame)
+
+		for frame in frames:
+			send_response(self.client_sock, frame.get_raw_frame())
+		
+		self.client_stream_list[stream_idx].state = self.STREAM_STATES["closed"]
+		return True
+
 
 
 	def __get_client_stream_index_by_id(self, id):
