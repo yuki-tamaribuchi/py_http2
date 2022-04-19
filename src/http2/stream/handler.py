@@ -90,7 +90,7 @@ class StreamHandler:
 			stream.add_request_headers_to_table(frame.payload)
 
 			if frame.payload.is_end_stream:
-				request = stream.client_headers_table.create_request_instance()
+				request = self.__create_request_instance(stream)
 				self.request_queue.put((request, stream.stream_identifier))
 
 			self.__add_client_stream_to_list(stream)
