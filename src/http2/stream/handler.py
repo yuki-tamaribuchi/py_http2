@@ -6,6 +6,7 @@ from ..request import Request
 from ..frame import Frame
 from ..stream.stream import Stream
 from ..utils.flags import is_flagged
+from ..frame.settings import Settings
 
 
 def recv_request(client_sock):
@@ -97,21 +98,27 @@ class StreamHandler:
 
 		# SETTINGS frame
 		elif frame.frame_type == 4:
-			for s in frame.payload:
-				if s.identifier == 0:
-					pass
-				elif s.identifier == 1:
-					self.header_table_size = s.value
-				elif s.identifier == 2:
-					self.is_push_enabled = bool(s.value)
-				elif s.identifier == 3:
-					self.max_current_streams = s.value
-				elif s.identifier == 4:
-					self.windows_size = s.value
-				elif s.identifier == 5:
-					self.max_window_size = s.value
-				elif s.identifier == 6:
-					self.max_header_list_size = s.value
+			for field in frame.payload.fields:
+				if field.identifier == 1:
+					self.header_table_size = field.value
+				elif field.identifier == 2:
+					self.is_push_enabled = bool(field.value)
+				elif field.identifier == 3:
+					self.max_current_streams = field.value
+				elif field.identifier == 4:
+					self.windows_size = field.value
+				elif field.identifier == 5:
+					self.max_window_size = field.value
+				elif field.identifier == 6:
+					self.max_header_list_size = field.value
+			settings_ack = Settings(fields=None, is_ack=True)
+			settings_frame = Frame.create_frame(settings_ack, 0)
+			#send_response(self.client_sock, settings_frame.get_raw_frame())
+		
+		# GOAWAY frame
+		elif frame.frame_type == 7:
+			print(frame)
+			return True
 
 		# WINDOW_UPDATE frame
 		elif frame.frame_type == 8:
