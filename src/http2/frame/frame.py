@@ -42,7 +42,7 @@ class Frame:
 			elif frame_type == 1:
 				payload = cls.__load_headers_frame(cls, payload, flags)
 			elif frame_type == 4:
-				payload = cls.__load_settings_frame(cls, payload)
+				payload = cls.__load_settings_frame(cls, payload, flags)
 			elif frame_type == 7:
 				payload = cls.__load_goaway_frame(cls, payload)
 			elif frame_type == 8:
@@ -78,7 +78,7 @@ class Frame:
 		elif self.frame_type == 1:
 			raw_payload = self.payload.get_raw_frame()
 		elif self.frame_type == 4:
-			raw_payload = b"".join(frame.get_raw_frame for frame in self.payload)
+			raw_payload = self.payload.get_raw_frame()
 		else:
 			if type(self.payload) == bytes:
 				raw_payload = self.payload
@@ -93,7 +93,6 @@ class Frame:
 			self.flags,
 			self.stream_identifier
 		)
-
 		return raw_frame + raw_payload
 
 
@@ -112,8 +111,8 @@ class Frame:
 		return data
 
 
-	def __load_settings_frame(self, payload):
-		frame_list = Settings.load_raw_frame(payload)
+	def __load_settings_frame(self, payload, flags):
+		frame_list = Settings.load_raw_frame(payload, flags)
 		return frame_list
 
 
@@ -147,5 +146,11 @@ class Frame:
 			
 			if payload.padding_length:
 				flags = set_flag(flags, 0b100)
+		
+		elif isinstance(payload, Settings):
+			frame_type = 4
+
+			if payload.is_ack:
+				flags = set_flag(flags, 0b1)
 
 		return Frame(frame_type, flags, stream_identifier, payload)
