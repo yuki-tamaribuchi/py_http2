@@ -5,6 +5,7 @@ from ..request import Request
 from ..response import Response
 from ..frame import Frame
 from ..stream.handler import StreamHandler
+from ..frame.settings import Settings
 
 
 def recv_request(client_sock):
@@ -51,7 +52,6 @@ class Worker(Thread):
 	def start(self):
 		self.work_thread.start()
 		self.call_app_thread.start()
-
 		return
 
 	def __work(self):
@@ -78,7 +78,8 @@ class Worker(Thread):
 			else:
 				preface_frame = None
 
-			frame = Frame(0x4, 0x0, 0x0, b"")
+			settings_ack = Settings(None, False)
+			frame = Frame.create_frame(settings_ack, 0)
 			if not send_response(self.client_sock, frame.get_raw_frame()):
 				print("Preface send error")
 				raise Exception
