@@ -73,11 +73,7 @@ class Frame:
 			return frames
 
 	def get_raw_frame(self):
-		if self.frame_type == 0:
-			raw_payload = self.payload.get_raw_frame()
-		elif self.frame_type == 1:
-			raw_payload = self.payload.get_raw_frame()
-		elif self.frame_type == 4:
+		if self.frame_type in [0, 1, 4]:
 			raw_payload = self.payload.get_raw_frame()
 		else:
 			if type(self.payload) == bytes:
