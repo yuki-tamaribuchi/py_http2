@@ -57,6 +57,9 @@ class StreamHandler:
 		handle_request_thread.start()
 		handle_response_thread.start()
 
+		handle_request_thread.join()
+		handle_response_thread.join()
+
 
 	def __handle_request(self):
 		while True:
