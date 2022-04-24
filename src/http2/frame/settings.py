@@ -40,8 +40,8 @@ class Settings:
 
 		fields = []
 		for i in range(0, len(raw_frame), 6):
-			identifier = int.from_bytes(raw_frame[0:2], "big")
-			value = int.from_bytes(raw_frame[2:], "big")
+			identifier = int.from_bytes(raw_frame[i:i+2], "big")
+			value = int.from_bytes(raw_frame[i+2:i+6], "big")
 			setting_field = SettingField(identifier, value)
 			fields.append(setting_field)
 			
