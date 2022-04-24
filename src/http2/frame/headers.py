@@ -479,7 +479,7 @@ class Headers:
 
 
 	@classmethod
-	def load_table(cls, static_fields, dynamic_fileds):
+	def load_table(cls, static_fields, dynamic_fileds, is_end_headers, is_end_stream):
 		fields = []
 
 		for field_index in static_fields:
@@ -491,7 +491,11 @@ class Headers:
 			else:
 				fields.append(Field(2, name=field_dict["name"], name_h=False, value=field_dict["value"], value_h=False))
 
-		return Headers(fields)
+		return Headers(
+			fields=fields,
+			is_end_headers=is_end_headers,
+			is_end_stream=is_end_stream
+			)
 
 
 	def get_raw_frame(self):
