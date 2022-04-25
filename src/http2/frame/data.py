@@ -26,3 +26,10 @@ class Data:
 			padding_length=padding_length,
 			is_end_stream=is_end_stream
 		)
+
+	def get_raw_frame(self):
+		if self.padding_length:
+			print("Padding is not supported now")
+			raise Exception
+
+		return self.data
