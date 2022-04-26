@@ -1,3 +1,5 @@
-def is_flagged(flags, bit_n):
-	assert(bit_n >= 0 and bit_n <=7)
-	return bool(int(flags[7-bit_n]))
+def is_flagged(flags, flag_n):
+	assert(flag_n >= 0b00000000 and flag_n <=0b11111111)
+	if flags & flag_n == flag_n:
+		return True
+	return False
