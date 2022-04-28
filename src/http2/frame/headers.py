@@ -432,9 +432,17 @@ class Field:
 
 
 class Headers:
-	def __init__(self, fields, stream_dependency=None, weight=None, priority=None, padding_length=0, is_end_stream=False, is_end_headers=True):
+	exclusive_flag = 0x80000000
+
+	def __init__(self, fields, is_exclusive=None, stream_dependency=None, weight=None, priority=None, padding_length=0, is_end_stream=False, is_end_headers=True):
 		self.fields = fields
-		self.stream_dependency = stream_dependency
+		if is_exclusive or stream_dependency:
+			if not is_exclusive and not stream_dependency:
+				print("Please specify both is_exclusive and stream_dependency")
+				raise Exception
+			else:
+				self.is_exclusive = is_exclusive
+				self.stream_dependency = stream_dependency
 		self.weight = weight
 		self.priority = priority
 		self.padding_length = padding_length
@@ -464,14 +472,23 @@ class Headers:
 			else:
 				padding_length = 0
 
+			is_exclusive = None
+			stream_dependency = None
 			#priority
 			if is_flagged(flags, 0b10000):
-				print("Frame with priority is not supported now")
-				raise Exception
+				exclusive_and_stream_dependency = int.from_bytes(raw_frame[0:4], "big")
+				if exclusive_and_stream_dependency & cls.exclusive_flag == cls.exclusive_flag:
+					is_exclusive = True
+					stream_dependency = exclusive_and_stream_dependency ^ cls.exclusive_flag
+				else:
+					is_exclusive = False
+					stream_dependency = exclusive_and_stream_dependency
 		
 		fields = Field.load_raw_frame(raw_frame)
 		return Headers(
 			fields=fields,
+			is_exclusive=is_exclusive,
+			stream_dependency=stream_dependency,
 			padding_length=padding_length,
 			is_end_headers=is_end_headers,
 			is_end_stream=is_end_stream
