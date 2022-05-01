@@ -165,12 +165,16 @@ class Field:
 
 		def load_name(raw_frame):
 			current_byte_idx = 0
-			h_and_name_length_bin = bin_padding(bin(raw_frame[0]).replace("0b", ""))
-			name_h = bool(int(h_and_name_length_bin[0]))
-			if is_all_flagged(h_and_name_length_bin[1:]):
-				name_length, current_byte_idx = calc_multi_byte_value(raw_frame[1:], len(h_and_name_length_bin[1:]))
+			h_and_name_length_byte = raw_frame[0]
+			if h_and_name_length_byte & 0x80 == 0x80:
+				name_h = True
 			else:
-				name_length = int(h_and_name_length_bin[1:], 2)
+				name_h = False
+
+			if h_and_name_length_byte & 0x7f == 0x7f:
+				name_length, current_byte_idx = calc_multi_byte_value(raw_frame[1:], len(h_and_value_length_byte[1:]))
+			else:
+				name_length = h_and_name_length_byte ^ 0x80
 			name = raw_frame[1:1+name_length]
 			return (name, name_h, name_length, current_byte_idx)
 
