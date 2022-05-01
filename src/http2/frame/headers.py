@@ -185,8 +185,7 @@ class Field:
 			value = raw_frame[1:1+value_length]
 			return (value, value_h, value_length, current_byte_idx)
 
-		first_byte = bin(raw_frame[0]).replace("0b", "")
-		first_byte = bin_padding(first_byte)
+		first_byte = raw_frame[0]
 
 		current_byte_idx = 0
 		index_current_byte_idx = 0
@@ -209,11 +208,11 @@ class Field:
 
 
 		# Indexed Header Field
-		if first_byte[0] == "1":
-			if first_byte[1:] == "1111111":
+		if first_byte & 0x80 == 0x80:
+			if first_byte & 0x7f == 0x7f :
 				index, current_byte_idx = calc_multi_byte_value(raw_frame[1:], len(first_byte[1:]))
 			else:
-				index = int(first_byte[1:], 2)
+				index = first_byte ^ 0x80
 			field = Field(0, index)
 
 			if len(raw_frame[1:]) != 0:
@@ -222,11 +221,11 @@ class Field:
 		# Literal Header Field and Maximum Dynamic Table Size Change
 		else:
 			# Literal Header Field with Incremental Indexing
-			if first_byte[1] == "1":
-				if first_byte[2:] == "111111":
+			if first_byte & 0x40 == 0x40:
+				if first_byte & 0x3f == 0x3f:
 					index, index_current_byte_idx = calc_multi_byte_value(raw_frame[1:], len(first_byte[2:]))
 				else:
-					index = int(first_byte[2:], 2)
+					index = first_byte ^ 0x40
 
 				# New Name
 				if index == 0:
@@ -254,11 +253,11 @@ class Field:
 
 
 			# Literal Header Field without Indexing
-			elif first_byte[1:4] == "000":
-				if first_byte[4:] == "1111":
-					index, index_current_byte_idx = calc_multi_byte_value(raw_frame[1:], len(first_byte[4:]))
+			elif first_byte < 0x10:
+				if first_byte == 0xf:
+					index, index_current_byte_idx = calc_multi_byte_value(raw_frame[1:], 4)
 				else:
-					index = int(first_byte[4:], 2)
+					index = first_byte
 
 				# New Name
 				if index == 0:
@@ -284,11 +283,11 @@ class Field:
 						next_field = load_next_field(raw_frame[2+index_current_byte_idx+value_length+value_current_byte_idx:])
 			
 			# Literal Header Field Never Indexed
-			elif first_byte[1:4] == "001":
-				if first_byte[4:] == "1111":
-					index, index_current_byte_idx = calc_multi_byte_value(raw_frame[1:], len(first_byte[4:]))
+			elif first_byte & 0x10 == 0x10:
+				if first_byte == 0xf:
+					index, index_current_byte_idx = calc_multi_byte_value(raw_frame[1:], 4)
 				else:
-					index = int(first_byte[4:], 2)
+					index = first_byte
 
 				# New Name
 				if index==0:
@@ -314,11 +313,11 @@ class Field:
 						next_field = load_next_field(raw_frame[2+index_current_byte_idx+value_length+value_current_byte_idx:])
 
 			# Maximum Dynamic Table Size Change
-			elif first_byte[0:3] == "001":
-				if is_all_flagged(first_byte[3:]):
-					max_size, current_byte_idx = calc_multi_byte_value(raw_frame[1:], len(first_byte[3:]))
+			elif first_byte & 0x20 == 0x20:
+				if first_byte ^ 0x20 == 0x1f:
+					max_size, current_byte_idx = calc_multi_byte_value(raw_frame[1:], 5)
 				else:
-					max_size = int(first_byte[3:] ,2)
+					max_size = first_byte ^ 0x20
 				field = Field(7, max_size=max_size)
 
 				if len(raw_frame[1+current_byte_idx:]) != 0:
