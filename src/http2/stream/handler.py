@@ -166,8 +166,13 @@ class StreamHandler:
 			data_frame = Frame.create_frame(data, stream_identifier)
 			frames.append(data_frame)
 
+		raw_response = b""
 		for frame in frames:
-			send_response(self.client_sock, frame.get_raw_frame())
+			raw_response += frame.get_raw_frame()
+
+		if not send_response(self.client_sock, raw_response):
+			print("send_response error")
+			raise Exception
 		
 		self.client_stream_list[stream_idx].state = self.STREAM_STATES["closed"]
 		return True
