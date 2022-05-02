@@ -34,8 +34,7 @@ class StreamHandler:
 		self.client_sock = client_sock
 		self.request_queue = request_queue
 		self.response_queue = response_queue
-		self.client_stream_list = []
-		self.server_stream_list = []
+		self.stream_list = []
 		self.max_current_streams = None
 		self.current_max_stream_identification = None
 		self.window_size = None
@@ -76,10 +75,10 @@ class StreamHandler:
 		# DATA frame
 		if frame.frame_type == 0:
 			stream_idx = self.__get_client_stream_index_by_id(frame.stream_identifier)
-			self.client_stream_list[stream_idx].request_data = frame.payload.data
+			self.stream_list[stream_idx].request_data = frame.payload.data
 
 			if frame.payload.is_end_stream:
-				stream = self.client_stream_list[stream_idx]
+				stream = self.stream_list[stream_idx]
 				request = self.__create_request_instance(stream)
 				self.request_queue.put((request, stream.stream_identifier))
 
@@ -152,17 +151,17 @@ class StreamHandler:
 
 		if response_body:
 			is_end_stream = False
-			self.client_stream_list[stream_idx].response_data = response_body
+			self.stream_list[stream_idx].response_data = response_body
 		else:
 			is_end_stream = True
 
-		self.client_stream_list[stream_idx].response_headers_table.load_response(response_status, response_options)
-		headers = self.client_stream_list[stream_idx].response_headers_table.create_headers(is_end_headers=is_end_headers, is_end_stream=is_end_stream)
+		self.stream_list[stream_idx].response_headers_table.load_response(response_status, response_options)
+		headers = self.stream_list[stream_idx].response_headers_table.create_headers(is_end_headers=is_end_headers, is_end_stream=is_end_stream)
 		headers_frame = Frame.create_frame(headers, stream_identifier)
 		frames.append(headers_frame)
 
 		if response_body:
-			data = self.client_stream_list[stream_idx].create_response_data_frame(padding_length=None, is_end_stream=True)
+			data = self.stream_list[stream_idx].create_response_data_frame(padding_length=None, is_end_stream=True)
 			data_frame = Frame.create_frame(data, stream_identifier)
 			frames.append(data_frame)
 
@@ -174,19 +173,19 @@ class StreamHandler:
 			print("send_response error")
 			raise Exception
 		
-		self.client_stream_list[stream_idx].state = self.STREAM_STATES["closed"]
+		self.stream_list[stream_idx].state = self.STREAM_STATES["closed"]
 		return True
 
 
 
 	def __get_client_stream_index_by_id(self, id):
-		for i, stream in enumerate(self.client_stream_list):
+		for i, stream in enumerate(self.stream_list):
 			if stream.stream_identifier == id:
 				return i
 		return None
 
 	def __add_client_stream_to_list(self, stream):
-		self.client_stream_list.append(stream)
+		self.stream_list.append(stream)
 
 	
 	def __add_server_stream_to_list(self, stream):
