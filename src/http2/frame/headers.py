@@ -338,63 +338,62 @@ class Field:
 
 
 	def get_raw_frame(self):
+		first_byte = 0
 		if self.field_type == 0:
 			if self.index >= 2**7 - 1:
 				print("Multi bytes length is not supported now")
-			field_byte_str = "1" + bin_padding(bin(self.index).replace("0b", ""), 7)
-			return int(field_byte_str, 2).to_bytes(1, "big")
+			first_byte = first_byte | 0x80 | self.index
+			return first_byte.to_bytes(1, "big")
 		elif self.field_type == 1:
-			first_bit_str = "01" + bin_padding(bin(self.index).replace("0b", ""), 6)
-			first_bytes = int(first_bit_str, 2).to_bytes(1, "big")
+			first_byte = first_byte | 0x40 | self.index
+			first_byte = first_byte.to_bytes(1, "big")
 
+			value_h_and_length_bytes = 0
 			if self.value_h:
-				value_h = "1"
-			else:
-				value_h = "0"
+				value_h_and_length_bytes = value_bytes | 0x80
 			
 			value = bytes(self.value, "ascii")
-
 			length = len(value)
 			if length >= 2**7 - 1:
 				print("Multi bytes length is not supported now")
 				raise Exception
-			length_bit_str = bin_padding(bin(length).replace("0b", ""), 7)
-			value_length_bit_str = value_h + length_bit_str
-			value_length_bytes = int(value_length_bit_str, 2).to_bytes(1, "big")
+			else:
+				value_h_and_length_bytes = value_h_and_length_bytes | length
+			value_h_and_length_bytes = value_h_and_length_bytes.to_bytes(1, "big")
 			
-			return first_bytes + value_length_bytes + value
+			return first_byte + value_h_and_length_bytes + value
 
 		elif self.field_type == 2:
-			first_bit_str = "01000000"
-			first_bytes = int(first_bit_str, 2).to_bytes(1, "big")
+			first_byte = first_byte | 0x40
+			first_byte = first_byte.to_bytes(1, "big")
 
+			name_h_and_length_bytes = 0
 			if self.name_h:
-				name_h = "1"
-			else:
-				name_h = "0"
+				name_h_and_length_bytes = name_h_and_length_bytes | 0x80
 
 			name = bytes(self.name, "ascii")
 			name_length = len(name)
 			if name_length >= 2**7 - 1:
 				print("Multi bytes length is not supported now")
 				raise Exception
-			name_length_bit_str = name_h + bin_padding(bin(name_length).replace("0b", ""), 7)
-			name_length_bytes = int(name_length_bit_str, 2).to_bytes(1, "big")
-
-			if self.value_h:
-				value_h = "1"
 			else:
-				value_h = "0"
+				name_h_and_length_bytes = name_h_and_length_bytes | name_length
+			name_h_and_length_bytes = name_h_and_length_bytes.to_bytes(1, "big")
+
+			value_h_and_length_bytes = 0
+			if self.value_h:
+				value_h_and_length_bytes = value_h_and_length_bytes | 0x80
 
 			value = bytes(self.value, "ascii")
 			value_length = len(value)
 			if value_length >= 2**7 - 1:
 				print("Multi bytes length is not supported now")
 				raise Exception
-			value_length_bit_str = value_h + bin_padding(bin(value_length).replace("0b", ""), 7)
-			value_length_bytes = int(value_length_bit_str, 2).to_bytes(1, "big")
+			else:
+				value_h_and_length_bytes = value_h_and_length_bytes | value_length
+			value_h_and_length_bytes = value_h_and_length_bytes.to_bytes(1, "big")
 			
-			return first_bytes + name_length_bytes + name + value_length_bytes + value
+			return first_byte + name_h_and_length_bytes + name + value_h_and_length_bytes + value
 
 		else:
 			print("Type %s is not supported now"%(self.field_type_str))
