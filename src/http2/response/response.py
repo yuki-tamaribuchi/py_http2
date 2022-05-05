@@ -1,16 +1,7 @@
-status_dict = {
-	"101": "101 Switching Protocols",
-	"200": "200 OK"
-}
-
 class Response:
 	def __init__(self, version:str, status:int, options:dict=None, body:bytes=None):
-		if not str(status) in status_dict:
-			print("Please add status code %d to status_dict"%(status))
-			raise Exception
-		
 		self.version = version
-		self.status = status_dict[str(status)]
+		self.status = status
 		self.options = options
 		self.body = body
 
