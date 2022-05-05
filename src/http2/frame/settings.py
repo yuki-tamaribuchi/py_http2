@@ -63,6 +63,12 @@ class Settings:
 	
 
 	def __repr__(self):
-		return "Settings frame has %s fields"%(
-			len(self.fields)
-		)
+		if self.fields:
+			return "Settings frame has %s fields, is_ack:%d"%(
+				len(self.fields),
+				self.is_ack
+			)
+		else:
+			return "Settings frame has no fields, is_ack:%d"%(
+				self.is_ack
+			)
