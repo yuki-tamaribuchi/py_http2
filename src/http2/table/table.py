@@ -152,5 +152,5 @@ class Table:
 		return headers_dict
 
 	
-	def create_headers(self):
-		return Headers.load_table(self.used_static_field_indexes, self.dynamic_fileds)
+	def create_headers(self, is_end_headers, is_end_stream):
+		return Headers.load_table(self.used_static_field_indexes, self.dynamic_fileds, is_end_headers, is_end_stream)
