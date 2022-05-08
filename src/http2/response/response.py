@@ -21,3 +21,9 @@ class Response:
 			raw_response += self.body+b"\r\n"
 
 		return raw_response
+
+
+
+class H2Response(Response):
+	def __init__(self, status:int, options:dict=None, body:bytes=None):
+		super().__init__("HTTP/2.0", status, options, body)
